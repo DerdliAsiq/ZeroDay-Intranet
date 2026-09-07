@@ -1,0 +1,12 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+@import "tailwindcss";
+@theme { --font-sans: 'DM Sans', sans-serif; --font-display: 'Space Grotesk', sans-serif; }
+:root { font-family: 'DM Sans', sans-serif; color: #0f172a; background: #f6f8fb; }
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; }
+button { cursor: pointer; }
+.field { width:100%; border:1px solid #e2e8f0; border-radius:12px; background:#fff; padding:12px 14px; color:#0f172a; outline:none; transition:160ms ease; }
+.field:focus { border-color:#10b981; box-shadow:0 0 0 3px rgba(16,185,129,.12); }
+.primary { display:flex; align-items:center; justify-content:center; gap:8px; border-radius:12px; background:#0f172a; color:#fff; padding:12px 16px; font-size:13px; font-weight:700; transition:160ms ease; }
+.primary:hover { background:#10b981; color:#022c22; }
+::selection { background:#a7f3d0; color:#064e3b; }

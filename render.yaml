@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: zeroday-intranet
+    runtime: node
+    plan: free
+    buildCommand: pnpm install && pnpm db:generate && pnpm build
+    startCommand: node dist/index.js
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: zeroday-db
+          property: connectionString
+
+databases:
+  - name: zeroday-db
+    plan: free

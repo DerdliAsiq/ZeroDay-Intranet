@@ -1,0 +1,319 @@
+import { useState } from "react";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { trpc } from "@/lib/trpc";
+import {
+  LayoutDashboard, ClipboardCheck, CalendarDays, Users, LogOut,
+  ShieldCheck, Plus, Upload, Clock3, Menu, X, KeyRound,
+} from "lucide-react";
+import { toast } from "sonner";
+import Login from "./Login";
+import AdminUsers from "@/components/AdminUsers";
+
+const nav = [
+  { id: "overview", label: "İcmal", icon: LayoutDashboard },
+  { id: "tasks", label: "Tapşırıqlar", icon: ClipboardCheck },
+  { id: "schedule", label: "Dərs cədvəli", icon: CalendarDays },
+];
+
+function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <div className={`rounded-2xl border border-slate-200 bg-white shadow-[0_8px_30px_rgba(15,23,42,.05)] ${className}`}>{children}</div>;
+}
+
+function Badge({ children, tone = "green" }: { children: React.ReactNode; tone?: "green" | "amber" | "blue" }) {
+  const cls = tone === "green" ? "bg-emerald-50 text-emerald-700" : tone === "amber" ? "bg-amber-50 text-amber-700" : "bg-blue-50 text-blue-700";
+  return <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${cls}`}>{children}</span>;
+}
+
+function Account() {
+  const [cur, setCur] = useState("");
+  const [next, setNext] = useState("");
+  const change = trpc.auth.changePassword.useMutation({
+    onSuccess: () => {
+      toast.success("Şifrə dəyişdirildi");
+      setCur("");
+      setNext("");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  return (
+    <Card className="p-6">
+      <h3 className="font-bold">Şifrəni dəyiş</h3>
+      <div className="mt-4 grid max-w-md gap-3">
+        <input className="field" type="password" placeholder="Hazırkı şifrə" value={cur} onChange={(e) => setCur(e.target.value)} />
+        <input className="field" type="password" placeholder="Yeni şifrə (min 6)" value={next} onChange={(e) => setNext(e.target.value)} />
+        <button className="primary" onClick={() => change.mutate({ current: cur, next })}>Yadda saxla</button>
+      </div>
+    </Card>
+  );
+}
+
+export default function Home() {
+  const { user, loading, logout } = useAuth();
+  const [tab, setTab] = useState("overview");
+  const [open, setOpen] = useState(false);
+  const dash = trpc.dashboard.useQuery(undefined, { enabled: !!user });
+  const review = trpc.submissions.review.useMutation({
+    onSuccess: () => { toast.success("Yeniləndi"); dash.refetch(); },
+    onError: (e) => toast.error(e.message),
+  });
+  const createTask = trpc.tasks.create.useMutation({
+    onSuccess: () => { toast.success("Tapşırıq yaradıldı"); dash.refetch(); },
+    onError: (e) => toast.error(e.message),
+  });
+  const createLesson = trpc.lessons.create.useMutation({
+    onSuccess: () => { toast.success("Dərs əlavə edildi"); dash.refetch(); },
+    onError: (e) => toast.error(e.message),
+  });
+  const submit = trpc.submissions.create.useMutation({
+    onSuccess: () => { toast.success("Təhvil göndərildi"); dash.refetch(); },
+    onError: (e) => toast.error(e.message),
+  });
+  const [task, setTask] = useState({ title: "", description: "", dueAt: "", points: 100 });
+  const [lesson, setLesson] = useState({ title: "", instructor: "", track: "", room: "", startsAt: "", endsAt: "" });
+
+  if (loading) return <div className="grid min-h-screen place-items-center bg-[#f6f8fb] text-slate-500">Sistem yüklənir...</div>;
+  if (!user) return <Login />;
+
+  const data = dash.data;
+  const isAdmin = user.role === "admin";
+
+  const doSubmit = (taskId: number) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".pdf,.zip,.txt,.md,.py,.js,.ts,.png,.jpg";
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      if (file.size > 1_000_000) {
+        toast.error("Fayl 1MB-dan böyük ola bilməz");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => submit.mutate({ taskId, note: "Fayl ilə təqdim edildi", fileName: file.name, fileType: file.type, fileData: String(reader.result) });
+      reader.readAsDataURL(file);
+    };
+    input.click();
+  };
+
+  const titles: Record<string, string> = {
+    overview: "Xoş gəldin",
+    tasks: "Tapşırıqlar",
+    schedule: "Dərs cədvəli",
+    manage: "İdarəetmə mərkəzi",
+    users: "İstifadəçilər",
+    account: "Hesab",
+  };
+
+  return (
+    <div className="min-h-screen bg-[#f6f8fb] text-slate-900">
+      <aside className={`fixed inset-y-0 left-0 z-30 w-72 border-r border-slate-200 bg-slate-950 px-5 py-6 text-white transition-transform lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="grid size-10 place-items-center rounded-xl bg-emerald-400 text-slate-950"><ShieldCheck size={21} /></div>
+            <div><b className="block tracking-wide">ZERO DAY</b><span className="text-[10px] text-slate-400">INTRANET / 01</span></div>
+          </div>
+          <button className="lg:hidden" onClick={() => setOpen(false)}><X /></button>
+        </div>
+        <div className="mt-12 rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+          <p className="text-[10px] font-bold uppercase tracking-[.18em] text-emerald-400">Current member</p>
+          <p className="mt-2 font-semibold">{user.name || "Zero Day üzvü"}</p>
+          <p className="mt-1 truncate text-xs text-slate-400">{user.email}</p>
+        </div>
+        <nav className="mt-8 space-y-2">
+          {nav.map((n) => (
+            <button key={n.id} onClick={() => { setTab(n.id); setOpen(false); }} className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm transition ${tab === n.id ? "bg-emerald-400 font-semibold text-slate-950" : "text-slate-400 hover:bg-slate-900 hover:text-white"}`}>
+              <n.icon size={18} />{n.label}
+            </button>
+          ))}
+          {isAdmin && (
+            <>
+              <button onClick={() => { setTab("manage"); setOpen(false); }} className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm transition ${tab === "manage" ? "bg-emerald-400 font-semibold text-slate-950" : "text-slate-400 hover:bg-slate-900 hover:text-white"}`}>
+                <Users size={18} />İdarəetmə
+              </button>
+              <button onClick={() => { setTab("users"); setOpen(false); }} className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm transition ${tab === "users" ? "bg-emerald-400 font-semibold text-slate-950" : "text-slate-400 hover:bg-slate-900 hover:text-white"}`}>
+                <Users size={18} />İstifadəçilər
+              </button>
+            </>
+          )}
+          <button onClick={() => { setTab("account"); setOpen(false); }} className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm transition ${tab === "account" ? "bg-emerald-400 font-semibold text-slate-950" : "text-slate-400 hover:bg-slate-900 hover:text-white"}`}>
+            <KeyRound size={18} />Hesab
+          </button>
+        </nav>
+        <div className="absolute bottom-6 left-5 right-5">
+          <button onClick={() => logout()} className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm text-slate-400 hover:bg-slate-900 hover:text-white">
+            <LogOut size={17} />Çıxış
+          </button>
+        </div>
+      </aside>
+
+      <div className="lg:pl-72">
+        <header className="sticky top-0 z-20 flex h-20 items-center justify-between border-b border-slate-200 bg-white/85 px-5 backdrop-blur md:px-10">
+          <button className="lg:hidden" onClick={() => setOpen(true)}><Menu /></button>
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[.18em] text-emerald-600">Zero Day / Workspace</p>
+            <h1 className="mt-1 text-xl font-bold">{titles[tab] ?? tab}</h1>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="hidden text-sm text-slate-500 sm:block">{isAdmin ? "Administrator" : "Tələbə"}</span>
+            <div className="grid size-10 place-items-center rounded-full bg-emerald-100 font-bold text-emerald-700">{(user.name || "Z")[0]}</div>
+          </div>
+        </header>
+
+        <main className="mx-auto max-w-7xl space-y-8 p-5 md:p-10">
+          {tab === "overview" && (
+            <>
+              <section className="rounded-3xl bg-slate-950 p-7 text-white md:p-10">
+                <p className="text-xs font-bold uppercase tracking-[.2em] text-emerald-400">Focus / practice / ship</p>
+                <h2 className="mt-4 text-3xl font-bold tracking-tight md:text-5xl">Bilirdən nəticəyə.<br /><span className="text-emerald-400">Hər həftə bir addım.</span></h2>
+                <p className="mt-5 max-w-lg text-sm leading-7 text-slate-400">Tapşırıqları tamamla, həllərini təqdim et və sessiyanı qaçırma.</p>
+              </section>
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                {(
+                  [
+                    ["Aktiv tapşırıq", data?.stats.tasks ?? 0, ClipboardCheck],
+                    ["Təhvil", data?.stats.submissions ?? 0, Upload],
+                    ["Dərs sessiyası", data?.stats.lessons ?? 0, CalendarDays],
+                    ["Klub üzvü", data?.stats.students ?? 0, Users],
+                  ] as [string, number, typeof ClipboardCheck][]
+                ).map(([label, value, Icon]) => {
+                  const I = Icon;
+                  return (
+                    <Card key={label} className="p-5">
+                      <div className="flex items-center justify-between"><span className="text-sm text-slate-500">{label}</span><I size={18} className="text-emerald-600" /></div>
+                      <p className="mt-5 text-3xl font-bold">{value}</p>
+                    </Card>
+                  );
+                })}
+              </div>
+              <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
+                <Card className="p-6">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-bold">Son tapşırıqlar</h3>
+                    <button onClick={() => setTab("tasks")} className="text-xs font-semibold text-emerald-600">Hamısına bax</button>
+                  </div>
+                  <div className="mt-5 space-y-3">
+                    {(data?.tasks || []).slice(0, 4).map((t: { id: number; title: string; points: number; dueAt: Date | string | null }) => (
+                      <div key={t.id} className="flex items-center justify-between rounded-xl bg-slate-50 p-4">
+                        <div><p className="font-semibold">{t.title}</p><p className="mt-1 text-xs text-slate-500">{t.points} bal — {t.dueAt ? new Date(t.dueAt).toLocaleDateString("az-AZ") : "açıq"}</p></div>
+                        <Badge>Aktiv</Badge>
+                      </div>
+                    ))}
+                    {!data?.tasks?.length && <p className="py-8 text-center text-sm text-slate-400">Hələ tapşırıq yoxdur.</p>}
+                  </div>
+                </Card>
+                <Card className="p-6">
+                  <h3 className="font-bold">Növbəti sessiyalar</h3>
+                  <div className="mt-5 space-y-3">
+                    {(data?.lessons || []).slice(0, 3).map((l: { id: number; title: string; startsAt: Date | string; room: string | null }) => (
+                      <div key={l.id} className="flex gap-3 rounded-xl bg-slate-50 p-4">
+                        <div className="grid size-10 place-items-center rounded-lg bg-white text-emerald-600"><Clock3 size={18} /></div>
+                        <div><p className="font-semibold">{l.title}</p><p className="mt-1 text-xs text-slate-500">{new Date(l.startsAt).toLocaleString("az-AZ")} — {l.room || "Onlayn"}</p></div>
+                      </div>
+                    ))}
+                    {!data?.lessons?.length && <p className="py-8 text-center text-sm text-slate-400">Cədvəl boşdur.</p>}
+                  </div>
+                </Card>
+              </div>
+            </>
+          )}
+
+          {tab === "tasks" && (
+            <section className="grid gap-5">
+              {(data?.tasks || []).map((t: { id: number; title: string; description: string; points: number; dueAt: Date | string | null }) => (
+                <Card key={t.id} className="p-6">
+                  <div className="flex flex-col justify-between gap-4 md:flex-row">
+                    <div>
+                      <div className="flex items-center gap-3"><Badge>Aktiv</Badge><span className="text-xs text-slate-400">{t.points} bal</span></div>
+                      <h3 className="mt-3 text-xl font-bold">{t.title}</h3>
+                      <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">{t.description}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <span className="text-xs text-slate-400">Son tarix: {t.dueAt ? new Date(t.dueAt).toLocaleDateString("az-AZ") : "Açıq"}</span>
+                      {!isAdmin && <button onClick={() => doSubmit(t.id)} className="flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-xs font-semibold text-white hover:bg-emerald-600"><Upload size={15} />Təhvil ver</button>}
+                    </div>
+                  </div>
+                </Card>
+              ))}
+              {isAdmin && (
+                <Card className="border-dashed p-6">
+                  <h3 className="font-bold">Yeni tapşırıq yarat</h3>
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    <input className="field" placeholder="Tapşırıq adı" value={task.title} onChange={(e) => setTask({ ...task, title: e.target.value })} />
+                    <input className="field" type="number" placeholder="Bal" value={task.points} onChange={(e) => setTask({ ...task, points: Number(e.target.value) })} />
+                    <textarea className="field min-h-28 md:col-span-2" placeholder="Açıqlama" value={task.description} onChange={(e) => setTask({ ...task, description: e.target.value })} />
+                    <input className="field" type="datetime-local" value={task.dueAt} onChange={(e) => setTask({ ...task, dueAt: e.target.value })} />
+                    <button className="primary" onClick={() => createTask.mutate(task)}><Plus size={16} />Yarat</button>
+                  </div>
+                </Card>
+              )}
+            </section>
+          )}
+
+          {tab === "schedule" && (
+            <section>
+              <div className="grid gap-4 md:grid-cols-2">
+                {(data?.lessons || []).map((l: { id: number; title: string; track: string; instructor: string; room: string | null; startsAt: Date | string; endsAt: Date | string }) => (
+                  <Card key={l.id} className="p-6">
+                    <div className="flex items-start justify-between"><Badge tone="blue">{l.track}</Badge><CalendarDays className="text-emerald-600" size={20} /></div>
+                    <h3 className="mt-5 text-lg font-bold">{l.title}</h3>
+                    <p className="mt-2 text-sm text-slate-500">{l.instructor} — {l.room || "Onlayn"}</p>
+                    <div className="mt-5 border-t border-slate-100 pt-4 text-sm font-semibold">
+                      {new Date(l.startsAt).toLocaleString("az-AZ")} → {new Date(l.endsAt).toLocaleTimeString("az-AZ", { hour: "2-digit", minute: "2-digit" })}
+                    </div>
+                  </Card>
+                ))}
+              </div>
+              {isAdmin && (
+                <Card className="mt-6 p-6">
+                  <h3 className="font-bold">Cədvələ dərs əlavə et</h3>
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    <input className="field" placeholder="Dərsin adı" value={lesson.title} onChange={(e) => setLesson({ ...lesson, title: e.target.value })} />
+                    <input className="field" placeholder="Təlimçi" value={lesson.instructor} onChange={(e) => setLesson({ ...lesson, instructor: e.target.value })} />
+                    <input className="field" placeholder="İstiqamət" value={lesson.track} onChange={(e) => setLesson({ ...lesson, track: e.target.value })} />
+                    <input className="field" placeholder="Məkan / link" value={lesson.room} onChange={(e) => setLesson({ ...lesson, room: e.target.value })} />
+                    <input className="field" type="datetime-local" value={lesson.startsAt} onChange={(e) => setLesson({ ...lesson, startsAt: e.target.value })} />
+                    <input className="field" type="datetime-local" value={lesson.endsAt} onChange={(e) => setLesson({ ...lesson, endsAt: e.target.value })} />
+                    <button className="primary md:col-span-2" onClick={() => createLesson.mutate(lesson)}><Plus size={16} />Əlavə et</button>
+                  </div>
+                </Card>
+              )}
+            </section>
+          )}
+
+          {tab === "manage" && isAdmin && (
+            <Card className="p-6">
+              <h3 className="font-bold">Təhvillər və qiymətləndirmə</h3>
+              <div className="mt-5 overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="border-b border-slate-100 text-xs text-slate-400">
+                    <tr><th className="pb-3">Tələbə</th><th className="pb-3">Task</th><th className="pb-3">Fayl</th><th className="pb-3">Status</th><th className="pb-3">Əməl</th></tr>
+                  </thead>
+                  <tbody>
+                    {(data?.submissions || []).map((s: { id: number; studentId: number; taskId: number; fileName: string | null; note: string | null; status: string }) => (
+                      <tr key={s.id} className="border-b border-slate-50">
+                        <td className="py-4">#{s.studentId}</td>
+                        <td>{s.taskId}</td>
+                        <td>{s.fileName || s.note || "—"}</td>
+                        <td><Badge tone={s.status === "reviewed" ? "green" : "amber"}>{s.status}</Badge></td>
+                        <td>
+                          <div className="flex gap-2">
+                            <button className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700" onClick={() => review.mutate({ id: s.id, status: "reviewed" })}>Qəbul</button>
+                            <button className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700" onClick={() => review.mutate({ id: s.id, status: "returned" })}>Geri</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {!data?.submissions?.length && <p className="py-8 text-center text-sm text-slate-400">Hələ təhvil yoxdur.</p>}
+              </div>
+            </Card>
+          )}
+
+          {tab === "users" && isAdmin && <AdminUsers />}
+          {tab === "account" && <Account />}
+        </main>
+      </div>
+    </div>
+  );
+}

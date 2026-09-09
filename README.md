@@ -44,11 +44,11 @@ pnpm dev               # http://localhost:3000
 
 ## Roller ve akış
 
-- **Admin:** hər şey + kullanıcı ekler/siler, şifre belirler/sıfırlar.
-- **Mentor:** tapşırıq ve dərs yaradır, arxivləyir, bərpa edir, silir; təhvilləri qəbul/geri qaytarır, 10 üzerinden qiymət verir, təhvil dosyasını endirir. Kullanıcı yönetimi yapamaz.
-- **Tələbə:** tapşırıqlara baxır, fayl (max 100 MB, DB'de saklanır) ilə təhvil verir, şifrəsini dəyişir, qiymətini görür.
+- **Admin:** hər şey + kullanıcı ekler/siler, şifre belirler/sıfırlar, rol dəyişir (öz rolu hariç).
+- **Mentor:** tapşırıq ve dərs yaradır, arxivləyir, bərpa edir, silir; təhvilləri qəbul/geri qaytarır, 10 üzerinden qiymət + rəy verir, təhvil dosyasını endirir. Kullanıcı yönetimi yapamaz.
+- **Tələbə:** tapşırıqlara baxır (ümumi + özünə təyin olunan xüsusi task'lar), fayl (max 100 MB, DB'de saklanır) ilə təhvil verir, şifrəsini dəyişir, qiymətini ve rəyini görür.
 
-Tapşırıq yaradarkən icazəli fayl tipləri seçilir (default: pdf, docx, zip, txt, md, png, jpg); `.exe` türevleri her durumda yasaktır. Qiymət verilən təhvilin dosya içeriği DB'den otomatik silinir (yer açılır).
+Tapşırıq yaradarkən icazəli fayl tipleri ve təyinli tələbələr seçilir (boş = hamıya); `.exe` türevleri her durumda yasaktır. Son tarix keçən task'a təhvil bağlanır. Qiymət verilən təhvilin dosya içeriği DB'den otomatik silinir (yer açılır).
 
 ## Güvenlik
 

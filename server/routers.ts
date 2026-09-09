@@ -7,6 +7,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { adminProcedure, mentorProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import {
+  countSubmissionsByTask,
   createLesson,
   createSubmission,
   createTask,
@@ -20,8 +21,10 @@ import {
   listLessons,
   listSubmissions,
   listTasks,
+  listStudents,
   listUsers,
   setLessonStatus,
+  setUserRole,
   setTaskStatus,
   touchLastSignIn,
   updateSubmission,
@@ -114,20 +117,30 @@ export const appRouter = router({
       await deleteUser(input.id);
       return { success: true } as const;
     }),
+    setRole: adminProcedure
+      .input(z.object({ id: z.number(), role: z.enum(["admin", "mentor", "student"]) }))
+      .mutation(async ({ ctx, input }) => {
+        if (input.id === ctx.user.id) throw new TRPCError({ code: "BAD_REQUEST", message: "Öz rolunuzu dəyişə bilməzsiniz" });
+        await setUserRole(input.id, input.role);
+        return { success: true } as const;
+      }),
   }),
   dashboard: protectedProcedure.query(async ({ ctx }) => ({
     stats: await dashboardStats(),
-    tasks: await listTasks(),
+    tasks: await listTasks({ userId: ctx.user.id, staff: isStaff(ctx.user.role) }),
     lessons: await listLessons(),
     submissions: await listSubmissions(isStaff(ctx.user.role) ? undefined : ctx.user.id),
   })),
+  students: router({
+    list: mentorProcedure.query(() => listStudents()),
+  }),
   tasks: router({
-    list: protectedProcedure.query(() => listTasks()),
-    listAll: mentorProcedure.query(() => listTasks(true)),
+    list: protectedProcedure.query(({ ctx }) => listTasks({ userId: ctx.user.id, staff: isStaff(ctx.user.role) })),
+    listAll: mentorProcedure.query(() => listTasks({ includeArchived: true })),
     create: mentorProcedure
-      .input(z.object({ title: z.string().min(3), description: z.string().min(3), dueAt: z.string().optional(), points: z.number().int().min(1).max(1000), allowedTypes: z.array(z.string()).optional() }))
+      .input(z.object({ title: z.string().min(3), description: z.string().min(3), dueAt: z.string().optional(), allowedTypes: z.array(z.string()).optional(), assigneeIds: z.array(z.number().int()).optional() }))
       .mutation(({ ctx, input }) =>
-        createTask({ title: input.title, description: input.description, dueAt: input.dueAt ? new Date(input.dueAt) : null, points: input.points, status: "active", allowedTypes: input.allowedTypes ?? DEFAULT_ALLOWED_TYPES, createdBy: ctx.user.id })
+        createTask({ title: input.title, description: input.description, dueAt: input.dueAt ? new Date(input.dueAt) : null, status: "active", allowedTypes: input.allowedTypes ?? DEFAULT_ALLOWED_TYPES, assigneeIds: input.assigneeIds?.length ? input.assigneeIds : null, createdBy: ctx.user.id })
       ),
     setStatus: mentorProcedure
       .input(z.object({ id: z.number(), status: z.enum(["active", "archived"]) }))
@@ -138,6 +151,10 @@ export const appRouter = router({
     remove: mentorProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
+        const n = await countSubmissionsByTask(input.id);
+        if (n > 0) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Bu tapşırığın təhvili var — əvvəlcə arxivlə" });
+        }
         await deleteTask(input.id);
         return { success: true } as const;
       }),
@@ -155,6 +172,9 @@ export const appRouter = router({
         }
         const task = await getTaskById(input.taskId);
         if (!task) throw new TRPCError({ code: "NOT_FOUND", message: "Tapşırıq tapılmadı" });
+        if (task.dueAt && new Date(task.dueAt).getTime() < Date.now()) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Son tarix keçib — təhvil bağlıdır" });
+        }
         if (input.fileData) {
           const ext = fileExtension(input.fileName ?? "");
           if (!ext) throw new TRPCError({ code: "BAD_REQUEST", message: "Fayl uzantısı olmalıdır" });

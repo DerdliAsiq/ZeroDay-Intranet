@@ -91,8 +91,13 @@ export default function Home() {
     onSuccess: () => { toast.success("Silindi"); refreshAll(); },
     onError: (e) => toast.error(e.message),
   });
-  const [task, setTask] = useState({ title: "", description: "", dueAt: "", points: 100, allowedTypes: ["pdf", "docx", "zip", "txt", "md", "png", "jpg"] });
+  const [task, setTask] = useState({ title: "", description: "", dueAt: "", allowedTypes: ["pdf", "docx", "zip", "txt", "md", "png", "jpg"], assigneeIds: [] as number[] });
   const [grades, setGrades] = useState<Record<number, string>>({});
+  const [feedbacks, setFeedbacks] = useState<Record<number, string>>({});
+  const students = trpc.students.list.useQuery(undefined, { enabled: isStaffUser });
+  const toggleAssignee = (id: number) => {
+    setTask((t) => (t.assigneeIds.includes(id) ? { ...t, assigneeIds: t.assigneeIds.filter((x) => x !== id) } : { ...t, assigneeIds: [...t.assigneeIds, id] }));
+  };
   const toggleType = (ext: string) => {
     setTask((t) => (t.allowedTypes.includes(ext) ? { ...t, allowedTypes: t.allowedTypes.filter((x) => x !== ext) } : { ...t, allowedTypes: [...t.allowedTypes, ext] }));
   };
@@ -105,6 +110,9 @@ export default function Home() {
   const isAdmin = user.role === "admin";
   const isStaff = user.role === "admin" || user.role === "mentor";
   const roleLabel = user.role === "admin" ? "Administrator" : user.role === "mentor" ? "Mentor" : "Tələbə";
+  const taskTitles: Record<number, string> = {};
+  for (const t of ((data?.tasks ?? []) as { id: number; title: string }[])) taskTitles[t.id] = t.title;
+  for (const t of ((allTasks.data ?? []) as { id: number; title: string }[])) taskTitles[t.id] = t.title;
 
   const doSubmit = (taskId: number, allowed?: string[] | null) => {
     const input = document.createElement("input");
@@ -238,9 +246,9 @@ export default function Home() {
                     <button onClick={() => setTab("tasks")} className="text-xs font-semibold text-emerald-600">Hamısına bax</button>
                   </div>
                   <div className="mt-5 space-y-3">
-                    {(data?.tasks || []).slice(0, 4).map((t: { id: number; title: string; points: number; dueAt: Date | string | null }) => (
+                    {(data?.tasks || []).slice(0, 4).map((t: { id: number; title: string; dueAt: Date | string | null; assigneeIds: number[] | null }) => (
                       <div key={t.id} className="flex items-center justify-between rounded-xl bg-slate-50 p-4">
-                        <div><p className="font-semibold">{t.title}</p><p className="mt-1 text-xs text-slate-500">{t.points} bal — {t.dueAt ? new Date(t.dueAt).toLocaleDateString("az-AZ") : "açıq"}</p></div>
+                        <div><p className="font-semibold">{t.title}</p><p className="mt-1 text-xs text-slate-500">{t.assigneeIds?.length ? "Xüsusi" : "Hamıya"} — {t.dueAt ? new Date(t.dueAt).toLocaleDateString("az-AZ") : "açıq"}</p></div>
                         <Badge>Aktiv</Badge>
                       </div>
                     ))}
@@ -265,25 +273,29 @@ export default function Home() {
 
           {tab === "tasks" && (
             <section className="grid gap-5">
-              {(data?.tasks || []).map((t: { id: number; title: string; description: string; points: number; dueAt: Date | string | null; allowedTypes: string[] | null }) => {
-                const mySub = ((data?.submissions ?? []) as { taskId: number; status: string; grade: number | null }[]).find((s) => s.taskId === t.id);
+              {(data?.tasks || []).map((t: { id: number; title: string; description: string; dueAt: Date | string | null; allowedTypes: string[] | null; assigneeIds: number[] | null }) => {
+                const mySub = ((data?.submissions ?? []) as { taskId: number; status: string; grade: number | null; feedback: string | null }[]).find((s) => s.taskId === t.id);
+                const pastDue = t.dueAt ? new Date(t.dueAt).getTime() < Date.now() : false;
                 return (
                 <Card key={t.id} className="p-6">
                   <div className="flex flex-col justify-between gap-4 md:flex-row">
                     <div>
-                      <div className="flex items-center gap-3">
-                        <Badge>Aktiv</Badge><span className="text-xs text-slate-400">{t.points} bal</span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge>Aktiv</Badge>
+                        {t.assigneeIds?.length ? <Badge tone="blue">Xüsusi</Badge> : null}
+                        {pastDue && <Badge tone="amber">Müddət bitib</Badge>}
                         {mySub && <Badge tone={mySub.grade !== null && mySub.grade !== undefined ? "green" : "blue"}>{mySub.grade !== null && mySub.grade !== undefined ? `Qiymət: ${mySub.grade}/10` : mySub.status}</Badge>}
                       </div>
                       <h3 className="mt-3 text-xl font-bold">{t.title}</h3>
                       <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">{t.description}</p>
                       <p className="mt-2 text-xs text-slate-400">İcazəli formatlar: {(t.allowedTypes ?? []).join(", ").toUpperCase() || "Hamısı"}</p>
+                      {mySub?.feedback && <p className="mt-2 max-w-2xl rounded-xl bg-emerald-50 p-3 text-sm leading-6 text-emerald-800">Rəy: {mySub.feedback}</p>}
                     </div>
                     <div className="flex shrink-0 items-center gap-3">
                       <span className="text-xs text-slate-400">Son tarix: {t.dueAt ? new Date(t.dueAt).toLocaleDateString("az-AZ") : "Açıq"}</span>
-                      {!isStaff && <button onClick={() => doSubmit(t.id, t.allowedTypes)} className="flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-xs font-semibold text-white hover:bg-emerald-600"><Upload size={15} />Təhvil ver</button>}
+                      {!isStaff && !pastDue && <button onClick={() => doSubmit(t.id, t.allowedTypes)} className="flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-xs font-semibold text-white hover:bg-emerald-600"><Upload size={15} />Təhvil ver</button>}
                       {isStaff && <button onClick={() => setTaskStatus.mutate({ id: t.id, status: "archived" })} className="rounded-xl bg-slate-100 px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-200">Arxivlə</button>}
-                      {isStaff && <ConfirmButton onConfirm={() => removeTask.mutate({ id: t.id })} className="rounded-xl bg-red-50 px-4 py-2.5 text-xs font-semibold text-red-600 hover:bg-red-100">Sil</ConfirmButton>}
+                      {isStaff && <ConfirmButton onConfirm={() => removeTask.mutate({ id: t.id })} className="rounded-xl bg-red-50 px-4 py-2.5 text-xs font-semibold text-red-600 hover:bg-red-100" armedClassName="rounded-xl bg-red-600 px-4 py-2.5 text-xs font-bold text-white" pending={removeTask.isPending}>Sil</ConfirmButton>}
                     </div>
                   </div>
                 </Card>
@@ -294,9 +306,24 @@ export default function Home() {
                   <h3 className="font-bold">Yeni tapşırıq yarat</h3>
                   <div className="mt-4 grid gap-3 md:grid-cols-2">
                     <input className="field" placeholder="Tapşırıq adı" value={task.title} onChange={(e) => setTask({ ...task, title: e.target.value })} />
-                    <input className="field" type="number" placeholder="Bal" value={task.points} onChange={(e) => setTask({ ...task, points: Number(e.target.value) })} />
-                    <textarea className="field min-h-28 md:col-span-2" placeholder="Açıqlama" value={task.description} onChange={(e) => setTask({ ...task, description: e.target.value })} />
                     <input className="field" type="datetime-local" value={task.dueAt} onChange={(e) => setTask({ ...task, dueAt: e.target.value })} />
+                    <textarea className="field min-h-28 md:col-span-2" placeholder="Açıqlama" value={task.description} onChange={(e) => setTask({ ...task, description: e.target.value })} />
+                    <div className="md:col-span-2">
+                      <p className="mb-2 text-xs font-semibold text-slate-500">Kimə? (boş = hamıya)</p>
+                      <div className="flex max-h-32 flex-wrap gap-2 overflow-y-auto">
+                        {((students.data ?? []) as { id: number; name: string | null; email: string | null }[]).map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => toggleAssignee(s.id)}
+                            className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${task.assigneeIds.includes(s.id) ? "bg-blue-500 text-white" : "bg-slate-100 text-slate-500"}`}
+                          >
+                            {s.name || s.email}
+                          </button>
+                        ))}
+                        {!students.data?.length && <p className="text-xs text-slate-400">Tələbə yoxdur</p>}
+                      </div>
+                    </div>
                     <div className="md:col-span-2">
                       <p className="mb-2 text-xs font-semibold text-slate-500">İcazəli fayl tipləri</p>
                       <div className="flex flex-wrap gap-2">
@@ -325,7 +352,7 @@ export default function Home() {
                         <p className="font-semibold">{t.title}</p>
                         <div className="flex gap-2">
                           <button onClick={() => setTaskStatus.mutate({ id: t.id, status: "active" })} className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">Bərpa et</button>
-                          <ConfirmButton onConfirm={() => removeTask.mutate({ id: t.id })} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600">Sil</ConfirmButton>
+                          <ConfirmButton onConfirm={() => removeTask.mutate({ id: t.id })} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600" pending={removeTask.isPending}>Sil</ConfirmButton>
                         </div>
                       </div>
                     ))}
@@ -349,7 +376,7 @@ export default function Home() {
                     {isStaff && (
                       <div className="mt-4 flex gap-2">
                         <button onClick={() => setLessonStatus.mutate({ id: l.id, status: "archived" })} className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-200">Arxivlə</button>
-                        <ConfirmButton onConfirm={() => removeLesson.mutate({ id: l.id })} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100">Sil</ConfirmButton>
+                        <ConfirmButton onConfirm={() => removeLesson.mutate({ id: l.id })} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100" pending={removeLesson.isPending}>Sil</ConfirmButton>
                       </div>
                     )}
                   </Card>
@@ -378,7 +405,7 @@ export default function Home() {
                         <p className="font-semibold">{l.title}</p>
                         <div className="flex gap-2">
                           <button onClick={() => setLessonStatus.mutate({ id: l.id, status: "active" })} className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">Bərpa et</button>
-                          <ConfirmButton onConfirm={() => removeLesson.mutate({ id: l.id })} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600">Sil</ConfirmButton>
+                          <ConfirmButton onConfirm={() => removeLesson.mutate({ id: l.id })} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600" pending={removeLesson.isPending}>Sil</ConfirmButton>
                         </div>
                       </div>
                     ))}
@@ -394,13 +421,13 @@ export default function Home() {
               <div className="mt-5 overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead className="border-b border-slate-100 text-xs text-slate-400">
-                    <tr><th className="pb-3">Tələbə</th><th className="pb-3">Task</th><th className="pb-3">Fayl</th><th className="pb-3">Status</th><th className="pb-3">Qiymət</th><th className="pb-3">Əməl</th></tr>
+                    <tr><th className="pb-3">Tələbə</th><th className="pb-3">Tapşırıq</th><th className="pb-3">Fayl</th><th className="pb-3">Status</th><th className="pb-3">Qiymət</th><th className="pb-3">Əməl</th></tr>
                   </thead>
                   <tbody>
                     {(data?.submissions || []).map((s: { id: number; studentId: number; taskId: number; fileName: string | null; note: string | null; status: string; fileData: string | null; fileUrl: string | null; grade: number | null }) => (
                       <tr key={s.id} className="border-b border-slate-50">
                         <td className="py-4">#{s.studentId}</td>
-                        <td>{s.taskId}</td>
+                        <td>{taskTitles[s.taskId] ?? <span className="text-slate-400">Task #{s.taskId} (silinib)</span>}</td>
                         <td>
                           {s.fileData ? (
                             <a href={s.fileData} download={s.fileName || "fayl"} className="font-semibold text-emerald-700 hover:underline">{s.fileName || "Faylı endir"}</a>
@@ -427,17 +454,24 @@ export default function Home() {
                           )}
                         </td>
                         <td>
+                          <textarea
+                            className="field mb-2 !py-1.5 !text-xs"
+                            rows={2}
+                            placeholder="Rəy (tələbə görəcək)"
+                            value={feedbacks[s.id] ?? ""}
+                            onChange={(e) => setFeedbacks({ ...feedbacks, [s.id]: e.target.value })}
+                          />
                           <div className="flex gap-2">
                             <button
                               className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700"
                               onClick={() => {
                                 const g = grades[s.id];
-                                review.mutate({ id: s.id, status: "reviewed", grade: g === undefined || g === "" ? undefined : Number(g) });
+                                review.mutate({ id: s.id, status: "reviewed", feedback: feedbacks[s.id] || undefined, grade: g === undefined || g === "" ? undefined : Number(g) });
                               }}
                             >
                               Qəbul
                             </button>
-                            <button className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700" onClick={() => review.mutate({ id: s.id, status: "returned" })}>Geri</button>
+                            <button className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700" onClick={() => review.mutate({ id: s.id, status: "returned", feedback: feedbacks[s.id] || undefined })}>Geri</button>
                           </div>
                         </td>
                       </tr>

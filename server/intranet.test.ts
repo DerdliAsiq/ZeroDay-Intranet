@@ -32,8 +32,20 @@ describe("Zero Day intranet access", () => {
 
   it("blocks task creation for students", async () => {
     await expect(
-      appRouter.createCaller(context("student")).tasks.create({ title: "Test task", description: "Test description", points: 50 })
+      appRouter.createCaller(context("student")).tasks.create({ title: "Test task", description: "Test description" })
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("blocks role change for mentors", async () => {
+    await expect(
+      appRouter.createCaller(context("mentor")).admin.setRole({ id: 2, role: "mentor" })
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("blocks self role change for admins", async () => {
+    await expect(
+      appRouter.createCaller(context("admin")).admin.setRole({ id: 7, role: "student" })
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
   it("rejects weak passwords on user creation", async () => {

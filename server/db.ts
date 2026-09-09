@@ -1,4 +1,4 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { InsertLesson, InsertSubmission, InsertTask, InsertUser, lessons, submissions, tasks, users } from "../drizzle/schema";
 
@@ -48,6 +48,22 @@ export async function createUser(v: InsertUser) {
   return rows[0];
 }
 
+export async function setUserRole(id: number, role: "admin" | "mentor" | "student") {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  return db.update(users).set({ role }).where(eq(users.id, id));
+}
+
+export async function listStudents() {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({ id: users.id, name: users.name, email: users.email })
+    .from(users)
+    .where(eq(users.role, "student"))
+    .orderBy(users.name);
+}
+
 export async function updateUserPassword(id: number, passwordHash: string) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
@@ -91,11 +107,18 @@ export async function upsertUser(user: Partial<InsertUser> & { openId?: string |
   }
 }
 
-export async function listTasks(includeArchived = false) {
+export async function listTasks(opts: { includeArchived?: boolean; userId?: number; staff?: boolean } = {}) {
   const db = await getDb();
   if (!db) return [];
-  if (includeArchived) return db.select().from(tasks).orderBy(desc(tasks.createdAt));
-  return db.select().from(tasks).where(eq(tasks.status, "active")).orderBy(desc(tasks.createdAt));
+  const conds = [];
+  if (!opts.includeArchived) conds.push(eq(tasks.status, "active"));
+  if (!opts.staff && opts.userId !== undefined) {
+    conds.push(
+      sql`("tasks"."assigneeIds" IS NULL OR cardinality("tasks"."assigneeIds") = 0 OR ${opts.userId} = ANY("tasks"."assigneeIds"))`
+    );
+  }
+  if (conds.length === 0) return db.select().from(tasks).orderBy(desc(tasks.createdAt));
+  return db.select().from(tasks).where(conds.length === 1 ? conds[0] : and(...conds)).orderBy(desc(tasks.createdAt));
 }
 
 export async function setTaskStatus(id: number, status: "active" | "archived") {
@@ -115,6 +138,13 @@ export async function createTask(v: InsertTask) {
   if (!db) throw new Error("Database unavailable");
   const rows = await db.insert(tasks).values(v).returning();
   return rows[0];
+}
+
+export async function countSubmissionsByTask(taskId: number) {
+  const db = await getDb();
+  if (!db) return 0;
+  const r = await db.select({ n: sql<number>`count(*)` }).from(submissions).where(eq(submissions.taskId, taskId));
+  return Number(r[0]?.n ?? 0);
 }
 
 export async function listSubmissions(studentId?: number) {

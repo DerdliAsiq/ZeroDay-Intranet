@@ -3,13 +3,19 @@ import { useEffect, useRef, useState } from "react";
 export default function ConfirmButton({
   onConfirm,
   className = "",
+  armedClassName,
   children,
-  confirmText = "Əminsən?",
+  confirmText = "Bəli, silinsin",
+  pending = false,
+  pendingText = "Silinir...",
 }: {
   onConfirm: () => void;
   className?: string;
+  armedClassName?: string;
   children: React.ReactNode;
   confirmText?: string;
+  pending?: boolean;
+  pendingText?: string;
 }) {
   const [armed, setArmed] = useState(false);
   const timer = useRef<number | null>(null);
@@ -21,13 +27,21 @@ export default function ConfirmButton({
     []
   );
 
+  if (pending) {
+    return (
+      <button className={className} disabled>
+        {pendingText}
+      </button>
+    );
+  }
+
   if (!armed) {
     return (
       <button
         className={className}
         onClick={() => {
           setArmed(true);
-          timer.current = window.setTimeout(() => setArmed(false), 4000);
+          timer.current = window.setTimeout(() => setArmed(false), 10000);
         }}
       >
         {children}
@@ -37,7 +51,7 @@ export default function ConfirmButton({
 
   return (
     <button
-      className={className}
+      className={armedClassName ?? "rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white"}
       onClick={() => {
         if (timer.current) window.clearTimeout(timer.current);
         setArmed(false);

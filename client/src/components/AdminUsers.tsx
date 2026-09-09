@@ -53,6 +53,13 @@ export default function AdminUsers() {
     },
     onError: (e) => toast.error(e.message),
   });
+  const setRole = trpc.admin.setRole.useMutation({
+    onSuccess: () => {
+      toast.success("Rol yeniləndi");
+      users.refetch();
+    },
+    onError: (e) => toast.error(e.message),
+  });
   const remove = trpc.admin.deleteUser.useMutation({
     onSuccess: () => {
       toast.success("İstifadəçi silindi");
@@ -102,7 +109,17 @@ export default function AdminUsers() {
                 <tr key={u.id} className="border-b border-slate-50">
                   <td className="py-3 font-semibold">{u.name}</td>
                   <td className="py-3 text-slate-500">{u.email}</td>
-                  <td className="py-3">{ROLE_LABELS[u.role] ?? u.role}</td>
+                  <td className="py-3">
+                    <select
+                      className="field w-32 !py-1.5 !text-xs"
+                      value={u.role}
+                      onChange={(e) => setRole.mutate({ id: u.id, role: e.target.value as "admin" | "mentor" | "student" })}
+                    >
+                      <option value="student">Tələbə</option>
+                      <option value="mentor">Mentor</option>
+                      <option value="admin">Administrator</option>
+                    </select>
+                  </td>
                   <td className="py-3">
                     <div className="flex flex-wrap gap-2">
                       <button
@@ -114,6 +131,8 @@ export default function AdminUsers() {
                       <ConfirmButton
                         onConfirm={() => remove.mutate({ id: u.id })}
                         className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100"
+                        armedClassName="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white"
+                        pending={remove.isPending}
                       >
                         Sil
                       </ConfirmButton>

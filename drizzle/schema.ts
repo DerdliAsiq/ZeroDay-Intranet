@@ -24,9 +24,9 @@ export const tasks = pgTable("tasks", {
   title: varchar("title", { length: 240 }).notNull(),
   description: text("description").notNull(),
   dueAt: timestamp("dueAt"),
-  points: integer("points").default(100).notNull(),
   status: taskStatusEnum("status").default("active").notNull(),
   allowedTypes: text("allowedTypes").array(),
+  assigneeIds: integer("assigneeIds").array(),
   createdBy: integer("createdBy").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });

@@ -66,7 +66,7 @@ describe("auth.logout", () => {
     const { ctx } = createAuthContext("student");
     const caller = appRouter.createCaller(ctx);
     await expect(
-      caller.tasks.create({ title: "Test task", description: "Test description", points: 50 })
+      caller.tasks.create({ title: "Test task", description: "Test description" })
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 });

@@ -7,13 +7,14 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { adminProcedure, mentorProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import {
-  countSubmissionsByTask,
+  countPendingSubmissionsByTask,
   createLesson,
   createSubmission,
   createTask,
   createUser,
   dashboardStats,
   deleteLesson,
+  deleteSubmissionsByTask,
   deleteTask,
   deleteUser,
   getTaskById,
@@ -154,10 +155,11 @@ export const appRouter = router({
     remove: mentorProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
-        const n = await countSubmissionsByTask(input.id);
-        if (n > 0) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Bu tapşırığın təhvili var — əvvəlcə arxivlə" });
+        const pending = await countPendingSubmissionsByTask(input.id);
+        if (pending > 0) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Qiymətləndirilməmiş təhvil var — əvvəlcə hamısını qiymətləndir" });
         }
+        await deleteSubmissionsByTask(input.id);
         await deleteTask(input.id);
         return { success: true } as const;
       }),

@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, ne, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { InsertLesson, InsertSubmission, InsertTask, InsertUser, lessons, submissions, tasks, users } from "../drizzle/schema";
 
@@ -145,6 +145,22 @@ export async function countSubmissionsByTask(taskId: number) {
   if (!db) return 0;
   const r = await db.select({ n: sql<number>`count(*)` }).from(submissions).where(eq(submissions.taskId, taskId));
   return Number(r[0]?.n ?? 0);
+}
+
+export async function countPendingSubmissionsByTask(taskId: number) {
+  const db = await getDb();
+  if (!db) return 0;
+  const r = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(submissions)
+    .where(and(eq(submissions.taskId, taskId), ne(submissions.status, "reviewed")));
+  return Number(r[0]?.n ?? 0);
+}
+
+export async function deleteSubmissionsByTask(taskId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  return db.delete(submissions).where(eq(submissions.taskId, taskId));
 }
 
 export async function listSubmissions(studentId?: number) {

@@ -51,7 +51,10 @@ export async function createUser(v: InsertUser) {
 export async function updateUserPassword(id: number, passwordHash: string) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  return db.update(users).set({ passwordHash }).where(eq(users.id, id));
+  return db
+    .update(users)
+    .set({ passwordHash, sessionVersion: sql`${users.sessionVersion} + 1` })
+    .where(eq(users.id, id));
 }
 
 export async function touchLastSignIn(id: number) {

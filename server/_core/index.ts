@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { sql } from "drizzle-orm";
 import express from "express";
 import { createServer } from "http";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
@@ -6,6 +7,7 @@ import { appRouter } from "../routers";
 import { hashPassword } from "./auth";
 import { createContext } from "./context";
 import { ENV } from "./env";
+import { loginLimiter } from "./rateLimit";
 import { serveStatic, setupVite } from "./vite";
 import { ensureAdmin, getDb } from "../db";
 
@@ -24,6 +26,14 @@ async function startServer() {
   const app = express();
   const server = createServer(app);
   app.set("trust proxy", 1);
+  app.disable("x-powered-by");
+  app.use((_req, res, next) => {
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+    res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    next();
+  });
   app.use(express.json({ limit: "2mb" }));
   app.use(express.urlencoded({ limit: "2mb", extended: true }));
 
@@ -31,6 +41,18 @@ async function startServer() {
     res.json({ ok: true, time: new Date().toISOString() });
   });
 
+  app.get("/api/ready", async (_req, res) => {
+    try {
+      const db = await getDb();
+      if (!db) throw new Error("no db");
+      await db.execute(sql`select 1`);
+      res.json({ ok: true });
+    } catch {
+      res.status(503).json({ ok: false });
+    }
+  });
+
+  app.use("/api/trpc", loginLimiter);
   app.use(
     "/api/trpc",
     createExpressMiddleware({

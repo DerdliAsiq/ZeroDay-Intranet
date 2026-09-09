@@ -1,7 +1,8 @@
-import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { COOKIE_NAME, SESSION_MS } from "@shared/const";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { hashPassword, signSession, verifyPassword } from "./_core/auth";
+import { assertPassword } from "./_core/password";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
@@ -39,8 +40,8 @@ export const appRouter = router({
         if (!user?.passwordHash) throw new TRPCError({ code: "UNAUTHORIZED", message: "Email ve ya sifre yanlisdir" });
         const ok = await verifyPassword(input.password, user.passwordHash);
         if (!ok) throw new TRPCError({ code: "UNAUTHORIZED", message: "Email ve ya sifre yanlisdir" });
-        const token = await signSession(user.id);
-        ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: ONE_YEAR_MS });
+        const token = await signSession(user.id, user.sessionVersion ?? 0);
+        ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: SESSION_MS });
         await touchLastSignIn(user.id);
         const { passwordHash: _omit, ...safe } = user as Record<string, unknown>;
         return safe;
@@ -50,8 +51,9 @@ export const appRouter = router({
       return { success: true } as const;
     }),
     changePassword: protectedProcedure
-      .input(z.object({ current: z.string().min(1), next: z.string().min(6) }))
+      .input(z.object({ current: z.string().min(1), next: z.string().min(10) }))
       .mutation(async ({ ctx, input }) => {
+        assertPassword(input.next);
         const full = await getUserByEmail(ctx.user.email ?? "");
         if (!full?.passwordHash) throw new TRPCError({ code: "BAD_REQUEST", message: "Sifre teyin edilmemisdir" });
         const ok = await verifyPassword(input.current, full.passwordHash);
@@ -69,8 +71,9 @@ export const appRouter = router({
       });
     }),
     createUser: adminProcedure
-      .input(z.object({ email: z.string().email(), name: z.string().min(1), password: z.string().min(6), role: z.enum(["user", "admin"]).default("user") }))
+      .input(z.object({ email: z.string().email(), name: z.string().min(1), password: z.string().min(10), role: z.enum(["user", "admin"]).default("user") }))
       .mutation(async ({ input }) => {
+        assertPassword(input.password);
         const exists = await getUserByEmail(input.email);
         if (exists) throw new TRPCError({ code: "CONFLICT", message: "Bu email artiq movcuddur" });
         const row = await createUser({
@@ -84,8 +87,9 @@ export const appRouter = router({
         return safe;
       }),
     resetPassword: adminProcedure
-      .input(z.object({ id: z.number(), password: z.string().min(6) }))
+      .input(z.object({ id: z.number(), password: z.string().min(10) }))
       .mutation(async ({ input }) => {
+        assertPassword(input.password);
         await updateUserPassword(input.id, await hashPassword(input.password));
         return { success: true } as const;
       }),

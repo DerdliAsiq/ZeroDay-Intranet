@@ -10,6 +10,7 @@ function context(role: "admin" | "user"): TrpcContext {
       name: "Test",
       email: "test@example.com",
       passwordHash: null,
+      sessionVersion: 0,
       loginMethod: "email",
       role,
       createdAt: new Date(),
@@ -33,6 +34,12 @@ describe("Zero Day intranet access", () => {
     await expect(
       appRouter.createCaller(context("user")).tasks.create({ title: "Test task", description: "Test description", points: 50 })
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("rejects weak passwords on user creation", async () => {
+    await expect(
+      appRouter.createCaller(context("admin")).admin.createUser({ email: "w@example.com", name: "W", password: "abcdefghij", role: "user" })
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
   it("rejects oversized file uploads", async () => {

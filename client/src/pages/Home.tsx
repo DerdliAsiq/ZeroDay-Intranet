@@ -40,7 +40,7 @@ function Account() {
       <h3 className="font-bold">Şifrəni dəyiş</h3>
       <div className="mt-4 grid max-w-md gap-3">
         <input className="field" type="password" placeholder="Hazırkı şifrə" value={cur} onChange={(e) => setCur(e.target.value)} />
-        <input className="field" type="password" placeholder="Yeni şifrə (min 6)" value={next} onChange={(e) => setNext(e.target.value)} />
+        <input className="field" type="password" placeholder="Yeni şifrə (min 10: Aa1@...)" value={next} onChange={(e) => setNext(e.target.value)} />
         <button className="primary" onClick={() => change.mutate({ current: cur, next })}>Yadda saxla</button>
       </div>
     </Card>

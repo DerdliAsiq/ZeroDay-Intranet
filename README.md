@@ -47,6 +47,14 @@ pnpm dev               # http://localhost:3000
 - **Admin:** kullanıcı ekler/siler, şifre belirler/sıfırlar, tapşırıq ve dərs yaradır, təhvilləri qəbul/geri qaytarır.
 - **Tələbə:** tapşırıqlara baxır, fayl (max 1 MB, DB'de saklanır) ilə təhvil verir, şifrəsini dəyişir.
 
+## Güvenlik
+
+- Parola politikası: min 10 karakter + küçük/büyük harf + rakam + özel karakter (`@#$%&`).
+- Session JWT ömrü 7 gün; parola değişince tüm oturumlar iptal olur (`sessionVersion`).
+- Login rate-limit: IP + email bazında 10 dakikada 10 deneme (sonrası 429).
+- Güvenlik başlıkları: HSTS, `X-Frame-Options: DENY`, `X-Content-Type-Options`, `Referrer-Policy`; `x-powered-by` kapalı; cookie `SameSite=Lax`.
+- `/api/ready`: DB bağlantısını kontrol eden readiness probu (DB yoksa 503).
+
 ## Render deploy
 
 1. Dashboard → New → Blueprint → bu repo (`render.yaml` web + postgres kurar).

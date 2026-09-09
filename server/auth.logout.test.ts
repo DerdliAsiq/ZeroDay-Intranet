@@ -18,6 +18,7 @@ function createAuthContext(role: "user" | "admin" = "user"): { ctx: TrpcContext;
     openId: null,
     email: "sample@example.com",
     passwordHash: null,
+    sessionVersion: 0,
     name: "Sample User",
     loginMethod: "email",
     role,
@@ -55,7 +56,7 @@ describe("auth.logout", () => {
     expect(clearedCookies[0]?.options).toMatchObject({
       maxAge: -1,
       secure: true,
-      sameSite: "none",
+      sameSite: "lax",
       httpOnly: true,
       path: "/",
     });

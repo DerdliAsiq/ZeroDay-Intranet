@@ -1,6 +1,31 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
+
+function PasswordField({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="relative">
+      <input
+        className="field pr-11"
+        type={show ? "text" : "password"}
+        placeholder={placeholder}
+        autoComplete="new-password"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <button
+        type="button"
+        aria-label={show ? "Şifrəni gizlət" : "Şifrəni göstər"}
+        onClick={() => setShow(!show)}
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+      >
+        {show ? <EyeOff size={17} /> : <Eye size={17} />}
+      </button>
+    </div>
+  );
+}
 
 export default function AdminUsers() {
   const users = trpc.admin.users.useQuery();
@@ -41,7 +66,7 @@ export default function AdminUsers() {
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <input className="field" placeholder="Ad" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           <input className="field" placeholder="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-          <input className="field" placeholder="Şifrə (min 6)" type="text" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+          <PasswordField placeholder="Şifrə (min 10: Aa1@...)" value={form.password} onChange={(v) => setForm({ ...form, password: v })} />
           <select className="field" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as "user" | "admin" })}>
             <option value="user">Tələbə</option>
             <option value="admin">Administrator</option>
@@ -93,12 +118,9 @@ export default function AdminUsers() {
                     </div>
                     {resetId === u.id && (
                       <div className="mt-2 flex gap-2">
-                        <input
-                          className="field !py-1.5 text-xs"
-                          placeholder="Yeni şifrə"
-                          value={resetPw}
-                          onChange={(e) => setResetPw(e.target.value)}
-                        />
+                        <div className="flex-1">
+                          <PasswordField placeholder="Yeni şifrə (min 10)" value={resetPw} onChange={setResetPw} />
+                        </div>
                         <button
                           className="primary !py-1.5 text-xs"
                           onClick={() => reset.mutate({ id: u.id, password: resetPw })}

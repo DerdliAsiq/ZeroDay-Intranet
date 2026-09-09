@@ -48,7 +48,7 @@ pnpm dev               # http://localhost:3000
 - **Mentor:** tapşırıq ve dərs yaradır, arxivləyir, bərpa edir, silir; təhvilləri qəbul edir, 10 üzerinden qiymət + rəy verir, təhvil dosyasını endirir. Kullanıcı yönetimi yapamaz.
 - **Tələbə:** tapşırıqlara baxır (ümumi + özünə təyin olunan xüsusi task'lar), hər task'a bir dəfə fayl (max 100 MB, DB'de saklanır) ilə təhvil verir, şifrəsini dəyişir, qiymətini ve rəyini görür.
 
-Tapşırıq yaradarkən icazəli fayl tipleri ve təyinli tələbələr aramalı siyahıdan seçilir (boş = hamıya); `.exe` türevleri her durumda yasaktır. Son tarix keçən task'a təhvil bağlanır. Qiymət verilən təhvilin dosya içeriği DB'den otomatik silinir (yer açılır). Dashboard sayaçları role göredir (tələbə öz kapsamını görür). `/robots.txt` arama motorlarına kapalıdır.
+Tapşırıq yaradarkən icazəli fayl tipleri ve təyinli tələbələr aramalı siyahıdan seçilir (boş = hamıya); `.exe` türevleri her durumda yasaktır. Son tarix keçən task'a təhvil bağlanır. Qiymət verilən təhvilin dosya içeriği DB'den otomatik silinir (yer açılır). Dashboard sayaçları role göredir (tələbə öz kapsamını görür). `/robots.txt` arama motorlarına kapalıdır. İdarəetmə cədvəlində tələbə ad-soyadı görünür; Hamısı/Gözləyən/Baxılan filtri ve axtarış vardır. Təhvili olan tapşırıq silinemez (əvvəlcə arxivlə).
 
 ## Güvenlik
 

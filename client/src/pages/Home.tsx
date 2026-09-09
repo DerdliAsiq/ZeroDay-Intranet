@@ -28,6 +28,12 @@ function Badge({ children, tone = "green" }: { children: React.ReactNode; tone?:
   return <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${cls}`}>{children}</span>;
 }
 
+type SubmissionRow = {
+  id: number; studentId: number; taskId: number; fileName: string | null; note: string | null;
+  status: string; fileData: string | null; fileUrl: string | null; grade: number | null;
+  studentName: string | null; studentEmail: string | null;
+};
+
 function Account() {
   const [cur, setCur] = useState("");
   const [next, setNext] = useState("");
@@ -103,6 +109,8 @@ export default function Home() {
   const [task, setTask] = useState({ title: "", description: "", dueAt: "", allowedTypes: ["pdf", "docx", "zip", "txt", "md", "png", "jpg"], assigneeIds: [] as number[] });
   const [grades, setGrades] = useState<Record<number, string>>({});
   const [feedbacks, setFeedbacks] = useState<Record<number, string>>({});
+  const [subFilter, setSubFilter] = useState<"all" | "submitted" | "reviewed">("all");
+  const [subSearch, setSubSearch] = useState("");
   const students = trpc.students.list.useQuery(undefined, { enabled: isStaffUser });
   const toggleAssignee = (id: number) => {
     setTask((t) => (t.assigneeIds.includes(id) ? { ...t, assigneeIds: t.assigneeIds.filter((x) => x !== id) } : { ...t, assigneeIds: [...t.assigneeIds, id] }));
@@ -419,15 +427,56 @@ export default function Home() {
           {tab === "manage" && isStaff && (
             <Card className="p-6">
               <h3 className="font-bold">Təhvillər və qiymətləndirmə</h3>
-              <div className="mt-5 overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="border-b border-slate-100 text-xs text-slate-400">
-                    <tr><th className="pb-3">Tələbə</th><th className="pb-3">Tapşırıq</th><th className="pb-3">Fayl</th><th className="pb-3">Status</th><th className="pb-3">Qiymət</th><th className="pb-3">Əməl</th></tr>
-                  </thead>
-                  <tbody>
-                    {(data?.submissions || []).map((s: { id: number; studentId: number; taskId: number; fileName: string | null; note: string | null; status: string; fileData: string | null; fileUrl: string | null; grade: number | null }) => (
+              {(() => {
+                const all = ((data?.submissions ?? []) as SubmissionRow[]);
+                const q = subSearch.trim().toLowerCase();
+                const visible = all.filter(
+                  (s) =>
+                    (subFilter === "all" || s.status === subFilter) &&
+                    (q === "" ||
+                      (s.studentName ?? "").toLowerCase().includes(q) ||
+                      (s.studentEmail ?? "").toLowerCase().includes(q) ||
+                      (taskTitles[s.taskId] ?? "").toLowerCase().includes(q) ||
+                      (s.fileName ?? "").toLowerCase().includes(q))
+                );
+                const pending = all.filter((s) => s.status === "submitted").length;
+                const done = all.filter((s) => s.status === "reviewed").length;
+                const tabs = [
+                  { id: "all" as const, label: `Hamısı (${all.length})` },
+                  { id: "submitted" as const, label: `Gözləyən (${pending})` },
+                  { id: "reviewed" as const, label: `Baxılan (${done})` },
+                ];
+                return (
+                  <>
+                    <div className="mt-5 flex flex-wrap items-center gap-2">
+                      {tabs.map((t) => (
+                        <button
+                          key={t.id}
+                          onClick={() => setSubFilter(t.id)}
+                          className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${subFilter === t.id ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}
+                        >
+                          {t.label}
+                        </button>
+                      ))}
+                      <input
+                        className="field ml-auto w-full !py-2 !text-xs sm:w-56"
+                        placeholder="Ad, task, fayl axtar..."
+                        value={subSearch}
+                        onChange={(e) => setSubSearch(e.target.value)}
+                      />
+                    </div>
+                    <div className="mt-5 overflow-x-auto">
+                      <table className="w-full text-left text-sm">
+                        <thead className="border-b border-slate-100 text-xs text-slate-400">
+                          <tr><th className="pb-3">Tələbə</th><th className="pb-3">Tapşırıq</th><th className="pb-3">Fayl</th><th className="pb-3">Status</th><th className="pb-3">Qiymət</th><th className="pb-3">Əməl</th></tr>
+                        </thead>
+                        <tbody>
+                          {visible.map((s) => (
                       <tr key={s.id} className="border-b border-slate-50">
-                        <td className="py-4">#{s.studentId}</td>
+                        <td className="py-4">
+                          <p className="font-semibold">{s.studentName || <span className="text-slate-400">Ad yoxdur</span>}</p>
+                          <p className="text-xs text-slate-400">{s.studentEmail || `#${s.studentId}`}</p>
+                        </td>
                         <td>{taskTitles[s.taskId] ?? <span className="text-slate-400">Task #{s.taskId} (silinib)</span>}</td>
                         <td>
                           {s.fileData ? (
@@ -476,10 +525,14 @@ export default function Home() {
                         </td>
                       </tr>
                     ))}
-                  </tbody>
-                </table>
-                {!data?.submissions?.length && <p className="py-8 text-center text-sm text-slate-400">Hələ təhvil yoxdur.</p>}
-              </div>
+                        </tbody>
+                      </table>
+                      {all.length === 0 && <p className="py-8 text-center text-sm text-slate-400">Hələ təhvil yoxdur.</p>}
+                      {all.length > 0 && visible.length === 0 && <p className="py-8 text-center text-sm text-slate-400">Axtarışa uyğun təhvil yoxdur.</p>}
+                    </div>
+                  </>
+                );
+              })()}
             </Card>
           )}
 

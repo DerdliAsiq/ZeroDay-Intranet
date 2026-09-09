@@ -150,8 +150,29 @@ export async function countSubmissionsByTask(taskId: number) {
 export async function listSubmissions(studentId?: number) {
   const db = await getDb();
   if (!db) return [];
-  if (studentId) return db.select().from(submissions).where(eq(submissions.studentId, studentId)).orderBy(desc(submissions.submittedAt));
-  return db.select().from(submissions).orderBy(desc(submissions.submittedAt));
+  const base = db
+    .select({
+      id: submissions.id,
+      taskId: submissions.taskId,
+      studentId: submissions.studentId,
+      note: submissions.note,
+      fileName: submissions.fileName,
+      fileUrl: submissions.fileUrl,
+      fileData: submissions.fileData,
+      fileType: submissions.fileType,
+      fileSize: submissions.fileSize,
+      status: submissions.status,
+      feedback: submissions.feedback,
+      grade: submissions.grade,
+      submittedAt: submissions.submittedAt,
+      reviewedAt: submissions.reviewedAt,
+      studentName: users.name,
+      studentEmail: users.email,
+    })
+    .from(submissions)
+    .leftJoin(users, eq(submissions.studentId, users.id));
+  if (studentId) return base.where(eq(submissions.studentId, studentId)).orderBy(desc(submissions.submittedAt));
+  return base.orderBy(desc(submissions.submittedAt));
 }
 
 export async function createSubmission(v: InsertSubmission) {

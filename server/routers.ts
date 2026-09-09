@@ -28,7 +28,7 @@ import {
   updateUserPassword,
 } from "./db";
 
-const MAX_FILE_BYTES = 1_000_000;
+const MAX_FILE_BYTES = 100_000_000;
 const DEFAULT_ALLOWED_TYPES = ["pdf", "docx", "zip", "txt", "md", "png", "jpg"];
 const FORBIDDEN_EXTENSIONS = ["exe", "msi", "bat", "cmd", "sh", "com", "scr", "ps1", "vbs", "reg", "dll", "sys"];
 
@@ -151,7 +151,7 @@ export const appRouter = router({
         if (input.fileData) {
           const base64 = input.fileData.includes(",") ? input.fileData.split(",")[1] : input.fileData;
           fileSize = Buffer.byteLength(base64 ?? "", "base64");
-          if (fileSize > MAX_FILE_BYTES) throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "Fayl 1MB-dan böyük ola bilməz" });
+          if (fileSize > MAX_FILE_BYTES) throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "Fayl 100MB-dan böyük ola bilməz" });
         }
         const task = await getTaskById(input.taskId);
         if (!task) throw new TRPCError({ code: "NOT_FOUND", message: "Tapşırıq tapılmadı" });

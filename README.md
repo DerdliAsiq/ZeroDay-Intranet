@@ -46,7 +46,7 @@ pnpm dev               # http://localhost:3000
 
 - **Admin:** hər şey + kullanıcı ekler/siler, şifre belirler/sıfırlar.
 - **Mentor:** tapşırıq ve dərs yaradır, arxivləyir, bərpa edir, silir; təhvilləri qəbul/geri qaytarır, 10 üzerinden qiymət verir, təhvil dosyasını endirir. Kullanıcı yönetimi yapamaz.
-- **Tələbə:** tapşırıqlara baxır, fayl (max 1 MB, DB'de saklanır) ilə təhvil verir, şifrəsini dəyişir, qiymətini görür.
+- **Tələbə:** tapşırıqlara baxır, fayl (max 100 MB, DB'de saklanır) ilə təhvil verir, şifrəsini dəyişir, qiymətini görür.
 
 Tapşırıq yaradarkən icazəli fayl tipləri seçilir (default: pdf, docx, zip, txt, md, png, jpg); `.exe` türevleri her durumda yasaktır. Qiymət verilən təhvilin dosya içeriği DB'den otomatik silinir (yer açılır).
 

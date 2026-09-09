@@ -113,8 +113,8 @@ export default function Home() {
     input.onchange = () => {
       const file = input.files?.[0];
       if (!file) return;
-      if (file.size > 1_000_000) {
-        toast.error("Fayl 1MB-dan böyük ola bilməz");
+      if (file.size > 100_000_000) {
+        toast.error("Fayl 100MB-dan böyük ola bilməz");
         return;
       }
       const reader = new FileReader();

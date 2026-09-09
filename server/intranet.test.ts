@@ -79,7 +79,7 @@ describe("Zero Day intranet access", () => {
   });
 
   it("rejects oversized file uploads", async () => {
-    const big = "a".repeat(1_400_000);
+    const big = "a".repeat(134_000_000);
     await expect(
       appRouter.createCaller(context("student")).submissions.create({ taskId: 1, fileName: "big.bin", fileData: big })
     ).rejects.toMatchObject({ code: "PAYLOAD_TOO_LARGE" });

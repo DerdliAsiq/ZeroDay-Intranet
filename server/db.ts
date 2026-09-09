@@ -155,10 +155,23 @@ export async function createLesson(v: InsertLesson) {
   return db.insert(lessons).values(v);
 }
 
-export async function updateSubmission(id: number, status: "reviewed" | "returned", feedback?: string) {
+export async function getTaskById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const r = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1);
+  return r[0];
+}
+
+export async function updateSubmission(id: number, status: "reviewed" | "returned", feedback?: string, grade?: number | null) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  return db.update(submissions).set({ status, feedback: feedback ?? null, reviewedAt: new Date() }).where(eq(submissions.id, id));
+  const patch: Partial<typeof submissions.$inferInsert> = { status, feedback: feedback ?? null, reviewedAt: new Date() };
+  if (grade !== undefined && grade !== null) {
+    patch.grade = grade;
+    patch.fileData = null;
+    patch.fileSize = null;
+  }
+  return db.update(submissions).set(patch).where(eq(submissions.id, id));
 }
 
 export async function dashboardStats() {
@@ -168,7 +181,7 @@ export async function dashboardStats() {
     db.select({ n: sql<number>`count(*)` }).from(tasks).where(eq(tasks.status, "active")),
     db.select({ n: sql<number>`count(*)` }).from(submissions),
     db.select({ n: sql<number>`count(*)` }).from(lessons).where(eq(lessons.status, "active")),
-    db.select({ n: sql<number>`count(*)` }).from(users).where(eq(users.role, "user")),
+    db.select({ n: sql<number>`count(*)` }).from(users).where(eq(users.role, "student")),
   ]);
   return { tasks: Number(t[0]?.n ?? 0), submissions: Number(s[0]?.n ?? 0), lessons: Number(l[0]?.n ?? 0), students: Number(u[0]?.n ?? 0) };
 }

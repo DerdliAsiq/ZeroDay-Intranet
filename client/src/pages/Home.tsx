@@ -8,6 +8,9 @@ import {
 import { toast } from "sonner";
 import Login from "./Login";
 import AdminUsers from "@/components/AdminUsers";
+import ConfirmButton from "@/components/ConfirmButton";
+
+const FILE_TYPE_PRESETS = ["pdf", "doc", "docx", "zip", "txt", "md", "png", "jpg", "py", "js", "ts"];
 
 const nav = [
   { id: "overview", label: "İcmal", icon: LayoutDashboard },
@@ -68,8 +71,9 @@ export default function Home() {
     onSuccess: () => { toast.success("Təhvil göndərildi"); dash.refetch(); },
     onError: (e) => toast.error(e.message),
   });
-  const allTasks = trpc.tasks.listAll.useQuery(undefined, { enabled: user?.role === "admin" });
-  const allLessons = trpc.lessons.listAll.useQuery(undefined, { enabled: user?.role === "admin" });
+  const isStaffUser = user?.role === "admin" || user?.role === "mentor";
+  const allTasks = trpc.tasks.listAll.useQuery(undefined, { enabled: isStaffUser });
+  const allLessons = trpc.lessons.listAll.useQuery(undefined, { enabled: isStaffUser });
   const refreshAll = () => { dash.refetch(); allTasks.refetch(); allLessons.refetch(); };
   const setTaskStatus = trpc.tasks.setStatus.useMutation({
     onSuccess: () => { toast.success("Yeniləndi"); refreshAll(); },
@@ -87,7 +91,11 @@ export default function Home() {
     onSuccess: () => { toast.success("Silindi"); refreshAll(); },
     onError: (e) => toast.error(e.message),
   });
-  const [task, setTask] = useState({ title: "", description: "", dueAt: "", points: 100 });
+  const [task, setTask] = useState({ title: "", description: "", dueAt: "", points: 100, allowedTypes: ["pdf", "docx", "zip", "txt", "md", "png", "jpg"] });
+  const [grades, setGrades] = useState<Record<number, string>>({});
+  const toggleType = (ext: string) => {
+    setTask((t) => (t.allowedTypes.includes(ext) ? { ...t, allowedTypes: t.allowedTypes.filter((x) => x !== ext) } : { ...t, allowedTypes: [...t.allowedTypes, ext] }));
+  };
   const [lesson, setLesson] = useState({ title: "", instructor: "", track: "", room: "", startsAt: "", endsAt: "" });
 
   if (loading) return <div className="grid min-h-screen place-items-center bg-[#f6f8fb] text-slate-500">Sistem yüklənir...</div>;
@@ -95,11 +103,13 @@ export default function Home() {
 
   const data = dash.data;
   const isAdmin = user.role === "admin";
+  const isStaff = user.role === "admin" || user.role === "mentor";
+  const roleLabel = user.role === "admin" ? "Administrator" : user.role === "mentor" ? "Mentor" : "Tələbə";
 
-  const doSubmit = (taskId: number) => {
+  const doSubmit = (taskId: number, allowed?: string[] | null) => {
     const input = document.createElement("input");
     input.type = "file";
-    input.accept = ".pdf,.zip,.txt,.md,.py,.js,.ts,.png,.jpg";
+    input.accept = allowed?.length ? allowed.map((e) => `.${e}`).join(",") : ".pdf,.zip,.txt,.md,.py,.js,.ts,.png,.jpg";
     input.onchange = () => {
       const file = input.files?.[0];
       if (!file) return;
@@ -144,15 +154,15 @@ export default function Home() {
               <n.icon size={18} />{n.label}
             </button>
           ))}
+          {isStaff && (
+            <button onClick={() => { setTab("manage"); setOpen(false); }} className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm transition ${tab === "manage" ? "bg-emerald-400 font-semibold text-slate-950" : "text-slate-400 hover:bg-slate-900 hover:text-white"}`}>
+              <Users size={18} />İdarəetmə
+            </button>
+          )}
           {isAdmin && (
-            <>
-              <button onClick={() => { setTab("manage"); setOpen(false); }} className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm transition ${tab === "manage" ? "bg-emerald-400 font-semibold text-slate-950" : "text-slate-400 hover:bg-slate-900 hover:text-white"}`}>
-                <Users size={18} />İdarəetmə
-              </button>
-              <button onClick={() => { setTab("users"); setOpen(false); }} className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm transition ${tab === "users" ? "bg-emerald-400 font-semibold text-slate-950" : "text-slate-400 hover:bg-slate-900 hover:text-white"}`}>
-                <Users size={18} />İstifadəçilər
-              </button>
-            </>
+            <button onClick={() => { setTab("users"); setOpen(false); }} className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm transition ${tab === "users" ? "bg-emerald-400 font-semibold text-slate-950" : "text-slate-400 hover:bg-slate-900 hover:text-white"}`}>
+              <Users size={18} />İstifadəçilər
+            </button>
           )}
           <button onClick={() => { setTab("account"); setOpen(false); }} className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm transition ${tab === "account" ? "bg-emerald-400 font-semibold text-slate-950" : "text-slate-400 hover:bg-slate-900 hover:text-white"}`}>
             <KeyRound size={18} />Hesab
@@ -173,7 +183,7 @@ export default function Home() {
             <h1 className="mt-1 text-xl font-bold">{titles[tab] ?? tab}</h1>
           </div>
           <div className="flex items-center gap-3">
-            <span className="hidden text-sm text-slate-500 sm:block">{isAdmin ? "Administrator" : "Tələbə"}</span>
+            <span className="hidden text-sm text-slate-500 sm:block">{roleLabel}</span>
             <div className="grid size-10 place-items-center rounded-full bg-emerald-100 font-bold text-emerald-700">{(user.name || "Z")[0]}</div>
           </div>
         </header>
@@ -255,24 +265,31 @@ export default function Home() {
 
           {tab === "tasks" && (
             <section className="grid gap-5">
-              {(data?.tasks || []).map((t: { id: number; title: string; description: string; points: number; dueAt: Date | string | null }) => (
+              {(data?.tasks || []).map((t: { id: number; title: string; description: string; points: number; dueAt: Date | string | null; allowedTypes: string[] | null }) => {
+                const mySub = ((data?.submissions ?? []) as { taskId: number; status: string; grade: number | null }[]).find((s) => s.taskId === t.id);
+                return (
                 <Card key={t.id} className="p-6">
                   <div className="flex flex-col justify-between gap-4 md:flex-row">
                     <div>
-                      <div className="flex items-center gap-3"><Badge>Aktiv</Badge><span className="text-xs text-slate-400">{t.points} bal</span></div>
+                      <div className="flex items-center gap-3">
+                        <Badge>Aktiv</Badge><span className="text-xs text-slate-400">{t.points} bal</span>
+                        {mySub && <Badge tone={mySub.grade !== null && mySub.grade !== undefined ? "green" : "blue"}>{mySub.grade !== null && mySub.grade !== undefined ? `Qiymət: ${mySub.grade}/10` : mySub.status}</Badge>}
+                      </div>
                       <h3 className="mt-3 text-xl font-bold">{t.title}</h3>
                       <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">{t.description}</p>
+                      <p className="mt-2 text-xs text-slate-400">İcazəli formatlar: {(t.allowedTypes ?? []).join(", ").toUpperCase() || "Hamısı"}</p>
                     </div>
                     <div className="flex shrink-0 items-center gap-3">
                       <span className="text-xs text-slate-400">Son tarix: {t.dueAt ? new Date(t.dueAt).toLocaleDateString("az-AZ") : "Açıq"}</span>
-                      {!isAdmin && <button onClick={() => doSubmit(t.id)} className="flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-xs font-semibold text-white hover:bg-emerald-600"><Upload size={15} />Təhvil ver</button>}
-                      {isAdmin && <button onClick={() => setTaskStatus.mutate({ id: t.id, status: "archived" })} className="rounded-xl bg-slate-100 px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-200">Arxivlə</button>}
-                      {isAdmin && <button onClick={() => { if (confirm(`"${t.title}" silinsin?`)) removeTask.mutate({ id: t.id }); }} className="rounded-xl bg-red-50 px-4 py-2.5 text-xs font-semibold text-red-600 hover:bg-red-100">Sil</button>}
+                      {!isStaff && <button onClick={() => doSubmit(t.id, t.allowedTypes)} className="flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-xs font-semibold text-white hover:bg-emerald-600"><Upload size={15} />Təhvil ver</button>}
+                      {isStaff && <button onClick={() => setTaskStatus.mutate({ id: t.id, status: "archived" })} className="rounded-xl bg-slate-100 px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-200">Arxivlə</button>}
+                      {isStaff && <ConfirmButton onConfirm={() => removeTask.mutate({ id: t.id })} className="rounded-xl bg-red-50 px-4 py-2.5 text-xs font-semibold text-red-600 hover:bg-red-100">Sil</ConfirmButton>}
                     </div>
                   </div>
                 </Card>
-              ))}
-              {isAdmin && (
+                );
+              })}
+              {isStaff && (
                 <Card className="border-dashed p-6">
                   <h3 className="font-bold">Yeni tapşırıq yarat</h3>
                   <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -280,11 +297,26 @@ export default function Home() {
                     <input className="field" type="number" placeholder="Bal" value={task.points} onChange={(e) => setTask({ ...task, points: Number(e.target.value) })} />
                     <textarea className="field min-h-28 md:col-span-2" placeholder="Açıqlama" value={task.description} onChange={(e) => setTask({ ...task, description: e.target.value })} />
                     <input className="field" type="datetime-local" value={task.dueAt} onChange={(e) => setTask({ ...task, dueAt: e.target.value })} />
+                    <div className="md:col-span-2">
+                      <p className="mb-2 text-xs font-semibold text-slate-500">İcazəli fayl tipləri</p>
+                      <div className="flex flex-wrap gap-2">
+                        {FILE_TYPE_PRESETS.map((ext) => (
+                          <button
+                            key={ext}
+                            type="button"
+                            onClick={() => toggleType(ext)}
+                            className={`rounded-lg px-3 py-1.5 text-xs font-bold uppercase ${task.allowedTypes.includes(ext) ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-500"}`}
+                          >
+                            {ext}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                     <button className="primary" onClick={() => createTask.mutate(task)}><Plus size={16} />Yarat</button>
                   </div>
                 </Card>
               )}
-              {isAdmin && (
+              {isStaff && (
                 <Card className="p-6">
                   <h3 className="font-bold">Arxivdəki tapşırıqlar ({((allTasks.data ?? []) as { status: string }[]).filter((t) => t.status === "archived").length})</h3>
                   <div className="mt-4 space-y-3">
@@ -293,7 +325,7 @@ export default function Home() {
                         <p className="font-semibold">{t.title}</p>
                         <div className="flex gap-2">
                           <button onClick={() => setTaskStatus.mutate({ id: t.id, status: "active" })} className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">Bərpa et</button>
-                          <button onClick={() => { if (confirm(`"${t.title}" həmişəlik silinsin?`)) removeTask.mutate({ id: t.id }); }} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600">Sil</button>
+                          <ConfirmButton onConfirm={() => removeTask.mutate({ id: t.id })} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600">Sil</ConfirmButton>
                         </div>
                       </div>
                     ))}
@@ -314,16 +346,16 @@ export default function Home() {
                     <div className="mt-5 border-t border-slate-100 pt-4 text-sm font-semibold">
                       {new Date(l.startsAt).toLocaleString("az-AZ")} → {new Date(l.endsAt).toLocaleTimeString("az-AZ", { hour: "2-digit", minute: "2-digit" })}
                     </div>
-                    {isAdmin && (
+                    {isStaff && (
                       <div className="mt-4 flex gap-2">
                         <button onClick={() => setLessonStatus.mutate({ id: l.id, status: "archived" })} className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-200">Arxivlə</button>
-                        <button onClick={() => { if (confirm(`"${l.title}" silinsin?`)) removeLesson.mutate({ id: l.id }); }} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100">Sil</button>
+                        <ConfirmButton onConfirm={() => removeLesson.mutate({ id: l.id })} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100">Sil</ConfirmButton>
                       </div>
                     )}
                   </Card>
                 ))}
               </div>
-              {isAdmin && (
+              {isStaff && (
                 <Card className="mt-6 p-6">
                   <h3 className="font-bold">Cədvələ dərs əlavə et</h3>
                   <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -337,7 +369,7 @@ export default function Home() {
                   </div>
                 </Card>
               )}
-              {isAdmin && (
+              {isStaff && (
                 <Card className="mt-6 p-6">
                   <h3 className="font-bold">Arxivdəki dərslər ({((allLessons.data ?? []) as { status: string }[]).filter((l) => l.status === "archived").length})</h3>
                   <div className="mt-4 space-y-3">
@@ -346,7 +378,7 @@ export default function Home() {
                         <p className="font-semibold">{l.title}</p>
                         <div className="flex gap-2">
                           <button onClick={() => setLessonStatus.mutate({ id: l.id, status: "active" })} className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">Bərpa et</button>
-                          <button onClick={() => { if (confirm(`"${l.title}" həmişəlik silinsin?`)) removeLesson.mutate({ id: l.id }); }} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600">Sil</button>
+                          <ConfirmButton onConfirm={() => removeLesson.mutate({ id: l.id })} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600">Sil</ConfirmButton>
                         </div>
                       </div>
                     ))}
@@ -356,16 +388,16 @@ export default function Home() {
             </section>
           )}
 
-          {tab === "manage" && isAdmin && (
+          {tab === "manage" && isStaff && (
             <Card className="p-6">
               <h3 className="font-bold">Təhvillər və qiymətləndirmə</h3>
               <div className="mt-5 overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead className="border-b border-slate-100 text-xs text-slate-400">
-                    <tr><th className="pb-3">Tələbə</th><th className="pb-3">Task</th><th className="pb-3">Fayl</th><th className="pb-3">Status</th><th className="pb-3">Əməl</th></tr>
+                    <tr><th className="pb-3">Tələbə</th><th className="pb-3">Task</th><th className="pb-3">Fayl</th><th className="pb-3">Status</th><th className="pb-3">Qiymət</th><th className="pb-3">Əməl</th></tr>
                   </thead>
                   <tbody>
-                    {(data?.submissions || []).map((s: { id: number; studentId: number; taskId: number; fileName: string | null; note: string | null; status: string; fileData: string | null; fileUrl: string | null }) => (
+                    {(data?.submissions || []).map((s: { id: number; studentId: number; taskId: number; fileName: string | null; note: string | null; status: string; fileData: string | null; fileUrl: string | null; grade: number | null }) => (
                       <tr key={s.id} className="border-b border-slate-50">
                         <td className="py-4">#{s.studentId}</td>
                         <td>{s.taskId}</td>
@@ -375,13 +407,36 @@ export default function Home() {
                           ) : s.fileUrl ? (
                             <a href={s.fileUrl} target="_blank" rel="noreferrer" className="font-semibold text-emerald-700 hover:underline">{s.fileName || "Faylı aç"}</a>
                           ) : (
-                            s.note || "—"
+                            <span>{s.fileName ? `${s.fileName} ` : ""}{s.fileName ? <span className="text-xs text-slate-400">(silinib)</span> : (s.note || "—")}</span>
                           )}
                         </td>
                         <td><Badge tone={s.status === "reviewed" ? "green" : "amber"}>{s.status}</Badge></td>
                         <td>
+                          {s.grade !== null && s.grade !== undefined ? (
+                            <Badge tone="green">{s.grade}/10</Badge>
+                          ) : (
+                            <input
+                              type="number"
+                              min={0}
+                              max={10}
+                              placeholder="0-10"
+                              className="field w-20 !py-1.5 text-center !text-xs"
+                              value={grades[s.id] ?? ""}
+                              onChange={(e) => setGrades({ ...grades, [s.id]: e.target.value })}
+                            />
+                          )}
+                        </td>
+                        <td>
                           <div className="flex gap-2">
-                            <button className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700" onClick={() => review.mutate({ id: s.id, status: "reviewed" })}>Qəbul</button>
+                            <button
+                              className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700"
+                              onClick={() => {
+                                const g = grades[s.id];
+                                review.mutate({ id: s.id, status: "reviewed", grade: g === undefined || g === "" ? undefined : Number(g) });
+                              }}
+                            >
+                              Qəbul
+                            </button>
                             <button className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700" onClick={() => review.mutate({ id: s.id, status: "returned" })}>Geri</button>
                           </div>
                         </td>

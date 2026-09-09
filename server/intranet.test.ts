@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 
-function context(role: "admin" | "user"): TrpcContext {
+function context(role: "admin" | "mentor" | "student"): TrpcContext {
   return {
     user: {
       id: 7,
@@ -24,7 +24,7 @@ function context(role: "admin" | "user"): TrpcContext {
 
 describe("Zero Day intranet access", () => {
   it("returns dashboard data for an authenticated student", async () => {
-    const result = await appRouter.createCaller(context("user")).dashboard();
+    const result = await appRouter.createCaller(context("student")).dashboard();
     expect(result).toHaveProperty("stats");
     expect(result).toHaveProperty("tasks");
     expect(result).toHaveProperty("lessons");
@@ -32,32 +32,56 @@ describe("Zero Day intranet access", () => {
 
   it("blocks task creation for students", async () => {
     await expect(
-      appRouter.createCaller(context("user")).tasks.create({ title: "Test task", description: "Test description", points: 50 })
+      appRouter.createCaller(context("student")).tasks.create({ title: "Test task", description: "Test description", points: 50 })
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
   it("rejects weak passwords on user creation", async () => {
     await expect(
-      appRouter.createCaller(context("admin")).admin.createUser({ email: "w@example.com", name: "W", password: "abcdefghij", role: "user" })
+      appRouter.createCaller(context("admin")).admin.createUser({ email: "w@example.com", name: "W", password: "abcdefghij", role: "student" })
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
   it("blocks task archive for students", async () => {
     await expect(
-      appRouter.createCaller(context("user")).tasks.setStatus({ id: 1, status: "archived" })
+      appRouter.createCaller(context("student")).tasks.setStatus({ id: 1, status: "archived" })
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
   it("blocks lesson delete for students", async () => {
     await expect(
-      appRouter.createCaller(context("user")).lessons.remove({ id: 1 })
+      appRouter.createCaller(context("student")).lessons.remove({ id: 1 })
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("blocks review for students", async () => {
+    await expect(
+      appRouter.createCaller(context("student")).submissions.review({ id: 1, status: "reviewed", grade: 8 })
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("blocks user management for mentors", async () => {
+    await expect(
+      appRouter.createCaller(context("mentor")).admin.deleteUser({ id: 2 })
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("allows review for mentors (fails only on missing DB)", async () => {
+    await expect(
+      appRouter.createCaller(context("mentor")).submissions.review({ id: 1, status: "reviewed", grade: 8 })
+    ).rejects.toThrow("Database unavailable");
+  });
+
+  it("rejects out-of-range grades", async () => {
+    await expect(
+      appRouter.createCaller(context("admin")).submissions.review({ id: 1, status: "reviewed", grade: 11 })
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
   it("rejects oversized file uploads", async () => {
     const big = "a".repeat(1_400_000);
     await expect(
-      appRouter.createCaller(context("user")).submissions.create({ taskId: 1, fileName: "big.bin", fileData: big })
+      appRouter.createCaller(context("student")).submissions.create({ taskId: 1, fileName: "big.bin", fileData: big })
     ).rejects.toMatchObject({ code: "PAYLOAD_TOO_LARGE" });
   });
 });

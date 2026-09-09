@@ -1,6 +1,6 @@
 import { integer, pgEnum, pgTable, serial, text, timestamp, varchar } from "drizzle-orm/pg-core";
 
-export const roleEnum = pgEnum("role", ["user", "admin"]);
+export const roleEnum = pgEnum("role", ["admin", "mentor", "student"]);
 export const taskStatusEnum = pgEnum("task_status", ["active", "archived"]);
 export const lessonStatusEnum = pgEnum("lesson_status", ["active", "archived"]);
 export const submissionStatusEnum = pgEnum("submission_status", ["submitted", "reviewed", "returned"]);
@@ -13,7 +13,7 @@ export const users = pgTable("users", {
   passwordHash: text("passwordHash"),
   sessionVersion: integer("sessionVersion").default(0).notNull(),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: roleEnum("role").default("user").notNull(),
+  role: roleEnum("role").default("student").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -26,6 +26,7 @@ export const tasks = pgTable("tasks", {
   dueAt: timestamp("dueAt"),
   points: integer("points").default(100).notNull(),
   status: taskStatusEnum("status").default("active").notNull(),
+  allowedTypes: text("allowedTypes").array(),
   createdBy: integer("createdBy").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
@@ -42,6 +43,7 @@ export const submissions = pgTable("submissions", {
   fileSize: integer("fileSize"),
   status: submissionStatusEnum("status").default("submitted").notNull(),
   feedback: text("feedback"),
+  grade: integer("grade"),
   submittedAt: timestamp("submittedAt").defaultNow().notNull(),
   reviewedAt: timestamp("reviewedAt"),
 });

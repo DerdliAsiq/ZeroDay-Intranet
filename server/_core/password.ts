@@ -1,11 +1,11 @@
 import { TRPCError } from "@trpc/server";
 
 export function validatePassword(pw: string): string | null {
-  if (pw.length < 10) return "Sifre en az 10 karakter olmalidir";
-  if (!/[a-z]/.test(pw)) return "Sifre kucuk harf icermelidir";
-  if (!/[A-Z]/.test(pw)) return "Sifre buyuk harf icermelidir";
-  if (!/[0-9]/.test(pw)) return "Sifre rakam icermelidir";
-  if (!/[@#$%&]/.test(pw)) return "Sifre ozel karakter icermelidir (@#$%&)";
+  if (pw.length < 10) return "Şifrə ən az 10 simvol olmalıdır";
+  if (!/[a-z]/.test(pw)) return "Şifrə kiçik hərf ehtiva etməlidir";
+  if (!/[A-Z]/.test(pw)) return "Şifrə böyük hərf ehtiva etməlidir";
+  if (!/[0-9]/.test(pw)) return "Şifrə rəqəm ehtiva etməlidir";
+  if (!/[@#$%&]/.test(pw)) return "Şifrə xüsusi simvol ehtiva etməlidir (@#$%&)";
   return null;
 }
 

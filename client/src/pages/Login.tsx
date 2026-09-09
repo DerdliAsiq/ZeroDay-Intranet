@@ -22,7 +22,7 @@ export default function Login() {
         <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-[0_8px_30px_rgba(15,23,42,.05)]">
           <p className="mb-2 text-xs font-bold uppercase tracking-[.2em] text-emerald-600">Secure access</p>
           <h1 className="text-3xl font-bold tracking-tight text-slate-950">Daxil ol</h1>
-          <p className="mt-3 text-sm leading-6 text-slate-500">Hesabını administrator yaradır. Email ve şifreni yaz.</p>
+          <p className="mt-3 text-sm leading-6 text-slate-500">Hesabını administrator yaradır. Email və şifrəni yaz.</p>
           <form
             className="mt-6 grid gap-3"
             onSubmit={(e) => {
@@ -34,7 +34,7 @@ export default function Login() {
             <input className="field" type="password" required placeholder="Şifre" value={password} onChange={(e) => setPassword(e.target.value)} />
             {loginError && <p className="text-sm font-semibold text-red-600">{loginError.message}</p>}
             <button className="primary" type="submit" disabled={loggingIn}>
-              {loggingIn ? "Giriş edilir..." : "Daxil ol"}
+              {loggingIn ? "Daxil olunur..." : "Daxil ol"}
             </button>
           </form>
           <p className="mt-6 text-center text-xs text-slate-400">Yalnız Zero Day üzvləri üçün</p>

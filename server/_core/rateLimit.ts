@@ -22,5 +22,5 @@ export const loginLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req) => `${req.ip ?? "unknown"}|${loginEmail(req.body)}`,
   skip: (req) => !req.path.includes("login"),
-  message: { error: "Cox fazla deneme. 10 dakika sonra tekrar deneyin." },
+  message: { error: "Çox sayda cəhd. 10 dəqiqə sonra yenidən cəhd edin." },
 });

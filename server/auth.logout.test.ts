@@ -10,7 +10,7 @@ type CookieCall = {
 
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
 
-function createAuthContext(role: "user" | "admin" = "user"): { ctx: TrpcContext; clearedCookies: CookieCall[] } {
+function createAuthContext(role: "student" | "admin" = "student"): { ctx: TrpcContext; clearedCookies: CookieCall[] } {
   const clearedCookies: CookieCall[] = [];
 
   const user: AuthenticatedUser = {
@@ -63,7 +63,7 @@ describe("auth.logout", () => {
   });
 
   it("blocks task creation for students", async () => {
-    const { ctx } = createAuthContext("user");
+    const { ctx } = createAuthContext("student");
     const caller = appRouter.createCaller(ctx);
     await expect(
       caller.tasks.create({ title: "Test task", description: "Test description", points: 50 })

@@ -2,6 +2,9 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
+import ConfirmButton from "./ConfirmButton";
+
+const ROLE_LABELS: Record<string, string> = { admin: "Administrator", mentor: "Mentor", student: "Tələbə" };
 
 function PasswordField({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
   const [show, setShow] = useState(false);
@@ -30,14 +33,14 @@ function PasswordField({ value, onChange, placeholder }: { value: string; onChan
 export default function AdminUsers() {
   const users = trpc.admin.users.useQuery();
   const utils = trpc.useUtils();
-  const [form, setForm] = useState({ email: "", name: "", password: "", role: "user" as "user" | "admin" });
+  const [form, setForm] = useState({ email: "", name: "", password: "", role: "student" as "admin" | "mentor" | "student" });
   const [resetId, setResetId] = useState<number | null>(null);
   const [resetPw, setResetPw] = useState("");
 
   const create = trpc.admin.createUser.useMutation({
     onSuccess: () => {
       toast.success("İstifadəçi yaradıldı");
-      setForm({ email: "", name: "", password: "", role: "user" });
+      setForm({ email: "", name: "", password: "", role: "student" });
       users.refetch();
     },
     onError: (e) => toast.error(e.message),
@@ -67,8 +70,9 @@ export default function AdminUsers() {
           <input className="field" placeholder="Ad" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           <input className="field" placeholder="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
           <PasswordField placeholder="Şifrə (min 10: Aa1@...)" value={form.password} onChange={(v) => setForm({ ...form, password: v })} />
-          <select className="field" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as "user" | "admin" })}>
-            <option value="user">Tələbə</option>
+          <select className="field" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as "admin" | "mentor" | "student" })}>
+            <option value="student">Tələbə</option>
+            <option value="mentor">Mentor</option>
             <option value="admin">Administrator</option>
           </select>
           <button
@@ -98,7 +102,7 @@ export default function AdminUsers() {
                 <tr key={u.id} className="border-b border-slate-50">
                   <td className="py-3 font-semibold">{u.name}</td>
                   <td className="py-3 text-slate-500">{u.email}</td>
-                  <td className="py-3">{u.role}</td>
+                  <td className="py-3">{ROLE_LABELS[u.role] ?? u.role}</td>
                   <td className="py-3">
                     <div className="flex flex-wrap gap-2">
                       <button
@@ -107,14 +111,12 @@ export default function AdminUsers() {
                       >
                         Şifrə
                       </button>
-                      <button
+                      <ConfirmButton
+                        onConfirm={() => remove.mutate({ id: u.id })}
                         className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100"
-                        onClick={() => {
-                          if (confirm(`${u.email} silinsin?`)) remove.mutate({ id: u.id });
-                        }}
                       >
                         Sil
-                      </button>
+                      </ConfirmButton>
                     </div>
                     {resetId === u.id && (
                       <div className="mt-2 flex gap-2">

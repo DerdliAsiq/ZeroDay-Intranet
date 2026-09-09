@@ -44,8 +44,11 @@ pnpm dev               # http://localhost:3000
 
 ## Roller ve akış
 
-- **Admin:** kullanıcı ekler/siler, şifre belirler/sıfırlar, tapşırıq ve dərs yaradır, təhvilləri qəbul/geri qaytarır, təhvil dosyasını endirir, tapşırıq/dərsi arxivləyir, bərpa edir veya silir.
-- **Tələbə:** tapşırıqlara baxır, fayl (max 1 MB, DB'de saklanır) ilə təhvil verir, şifrəsini dəyişir.
+- **Admin:** hər şey + kullanıcı ekler/siler, şifre belirler/sıfırlar.
+- **Mentor:** tapşırıq ve dərs yaradır, arxivləyir, bərpa edir, silir; təhvilləri qəbul/geri qaytarır, 10 üzerinden qiymət verir, təhvil dosyasını endirir. Kullanıcı yönetimi yapamaz.
+- **Tələbə:** tapşırıqlara baxır, fayl (max 1 MB, DB'de saklanır) ilə təhvil verir, şifrəsini dəyişir, qiymətini görür.
+
+Tapşırıq yaradarkən icazəli fayl tipləri seçilir (default: pdf, docx, zip, txt, md, png, jpg); `.exe` türevleri her durumda yasaktır. Qiymət verilən təhvilin dosya içeriği DB'den otomatik silinir (yer açılır).
 
 ## Güvenlik
 

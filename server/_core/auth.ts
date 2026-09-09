@@ -9,7 +9,8 @@ import { ENV } from "./env";
 export type SessionPayload = { userId: number };
 
 function secretKey() {
-  const s = ENV.cookieSecret || "dev-secret-change-me";
+  const s = ENV.cookieSecret;
+  if (!s) throw new Error("JWT_SECRET is required (see .env.example)");
   return new TextEncoder().encode(s);
 }
 

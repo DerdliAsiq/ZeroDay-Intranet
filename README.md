@@ -51,5 +51,7 @@ pnpm dev               # http://localhost:3000
 
 1. Dashboard → New → Blueprint → bu repo (`render.yaml` web + postgres kurar).
 2. `ADMIN_EMAIL` / `ADMIN_PASSWORD` gir (`JWT_SECRET` otomatik, `DATABASE_URL` DB'den bağlanır).
-3. İlk deploy sonrası Shell'den bir kez: `pnpm db:migrate`.
-4. `/api/health` → `{"ok":true}` ile doğrula.
+3. Start komutu migration'ı otomatik çalıştırır (`pnpm db:migrate && node dist/index.js`).
+4. `/api/health` → `{"ok":true}` ile doğrula, log'da `[Seed] admin ready` satırını gör.
+
+Manuel kurulumda (Blueprint'siz) DB'yi bir kez hazırla: `DATABASE_URL=... pnpm db:migrate`.

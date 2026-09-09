@@ -3,8 +3,8 @@ services:
     name: zeroday-intranet
     runtime: node
     plan: free
-    buildCommand: pnpm install && pnpm db:generate && pnpm build
-    startCommand: node dist/index.js
+    buildCommand: pnpm install && pnpm build
+    startCommand: pnpm db:migrate && node dist/index.js
     healthCheckPath: /api/health
     autoDeploy: true
     envVars:

@@ -68,7 +68,7 @@ describe("Zero Day intranet access", () => {
 
   it("blocks review for students", async () => {
     await expect(
-      appRouter.createCaller(context("student")).submissions.review({ id: 1, status: "reviewed", grade: 8 })
+      appRouter.createCaller(context("student")).submissions.review({ id: 1, grade: 8 })
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
@@ -80,13 +80,13 @@ describe("Zero Day intranet access", () => {
 
   it("allows review for mentors (fails only on missing DB)", async () => {
     await expect(
-      appRouter.createCaller(context("mentor")).submissions.review({ id: 1, status: "reviewed", grade: 8 })
+      appRouter.createCaller(context("mentor")).submissions.review({ id: 1, grade: 8 })
     ).rejects.toThrow("Database unavailable");
   });
 
   it("rejects out-of-range grades", async () => {
     await expect(
-      appRouter.createCaller(context("admin")).submissions.review({ id: 1, status: "reviewed", grade: 11 })
+      appRouter.createCaller(context("admin")).submissions.review({ id: 1, grade: 11 })
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 

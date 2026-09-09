@@ -204,16 +204,25 @@ export async function updateSubmission(id: number, status: "reviewed" | "returne
   return db.update(submissions).set(patch).where(eq(submissions.id, id));
 }
 
-export async function dashboardStats() {
+export async function dashboardStats(opts: { userId?: number; staff?: boolean } = {}) {
   const db = await getDb();
   if (!db) return { tasks: 0, submissions: 0, lessons: 0, students: 0 };
-  const [t, s, l, u] = await Promise.all([
-    db.select({ n: sql<number>`count(*)` }).from(tasks).where(eq(tasks.status, "active")),
-    db.select({ n: sql<number>`count(*)` }).from(submissions),
+  if (opts.staff || opts.userId === undefined) {
+    const [t, s, l, u] = await Promise.all([
+      db.select({ n: sql<number>`count(*)` }).from(tasks).where(eq(tasks.status, "active")),
+      db.select({ n: sql<number>`count(*)` }).from(submissions),
+      db.select({ n: sql<number>`count(*)` }).from(lessons).where(eq(lessons.status, "active")),
+      db.select({ n: sql<number>`count(*)` }).from(users).where(eq(users.role, "student")),
+    ]);
+    return { tasks: Number(t[0]?.n ?? 0), submissions: Number(s[0]?.n ?? 0), lessons: Number(l[0]?.n ?? 0), students: Number(u[0]?.n ?? 0) };
+  }
+  const visibleTasks = await listTasks({ userId: opts.userId });
+  const ownSubmissions = await listSubmissions(opts.userId);
+  const [l, u] = await Promise.all([
     db.select({ n: sql<number>`count(*)` }).from(lessons).where(eq(lessons.status, "active")),
     db.select({ n: sql<number>`count(*)` }).from(users).where(eq(users.role, "student")),
   ]);
-  return { tasks: Number(t[0]?.n ?? 0), submissions: Number(s[0]?.n ?? 0), lessons: Number(l[0]?.n ?? 0), students: Number(u[0]?.n ?? 0) };
+  return { tasks: visibleTasks.length, submissions: ownSubmissions.length, lessons: Number(l[0]?.n ?? 0), students: Number(u[0]?.n ?? 0) };
 }
 
 export async function ensureAdmin(email: string, passwordHash: string, name = "Administrator") {

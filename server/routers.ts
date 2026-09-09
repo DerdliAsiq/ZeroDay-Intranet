@@ -125,12 +125,15 @@ export const appRouter = router({
         return { success: true } as const;
       }),
   }),
-  dashboard: protectedProcedure.query(async ({ ctx }) => ({
-    stats: await dashboardStats(),
-    tasks: await listTasks({ userId: ctx.user.id, staff: isStaff(ctx.user.role) }),
-    lessons: await listLessons(),
-    submissions: await listSubmissions(isStaff(ctx.user.role) ? undefined : ctx.user.id),
-  })),
+  dashboard: protectedProcedure.query(async ({ ctx }) => {
+    const staff = isStaff(ctx.user.role);
+    return {
+      stats: await dashboardStats({ userId: ctx.user.id, staff }),
+      tasks: await listTasks({ userId: ctx.user.id, staff }),
+      lessons: await listLessons(),
+      submissions: await listSubmissions(staff ? undefined : ctx.user.id),
+    };
+  }),
   students: router({
     list: mentorProcedure.query(() => listStudents()),
   }),
@@ -175,6 +178,10 @@ export const appRouter = router({
         if (task.dueAt && new Date(task.dueAt).getTime() < Date.now()) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Son tarix keçib — təhvil bağlıdır" });
         }
+        const existing = await listSubmissions(ctx.user.id);
+        if (existing.some((s) => s.taskId === input.taskId)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Artıq təhvil vermisiniz" });
+        }
         if (input.fileData) {
           const ext = fileExtension(input.fileName ?? "");
           if (!ext) throw new TRPCError({ code: "BAD_REQUEST", message: "Fayl uzantısı olmalıdır" });
@@ -197,8 +204,8 @@ export const appRouter = router({
         });
       }),
     review: mentorProcedure
-      .input(z.object({ id: z.number(), status: z.enum(["reviewed", "returned"]), feedback: z.string().optional(), grade: z.number().int().min(0).max(10).optional() }))
-      .mutation(({ input }) => updateSubmission(input.id, input.status, input.feedback, input.grade ?? null)),
+      .input(z.object({ id: z.number(), feedback: z.string().optional(), grade: z.number().int().min(0).max(10).optional() }))
+      .mutation(({ input }) => updateSubmission(input.id, "reviewed", input.feedback, input.grade ?? null)),
   }),
   lessons: router({
     list: protectedProcedure.query(() => listLessons()),

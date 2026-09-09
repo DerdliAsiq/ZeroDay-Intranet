@@ -41,6 +41,10 @@ async function startServer() {
     res.json({ ok: true, time: new Date().toISOString() });
   });
 
+  app.get("/robots.txt", (_req, res) => {
+    res.type("text/plain").send("User-agent: *\nDisallow: /\n");
+  });
+
   app.get("/api/ready", async (_req, res) => {
     try {
       const db = await getDb();

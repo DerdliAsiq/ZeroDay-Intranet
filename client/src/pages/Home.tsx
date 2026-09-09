@@ -8,6 +8,7 @@ import {
 import { toast } from "sonner";
 import Login from "./Login";
 import AdminUsers from "@/components/AdminUsers";
+import AssigneePicker from "@/components/AssigneePicker";
 import ConfirmButton from "@/components/ConfirmButton";
 
 const FILE_TYPE_PRESETS = ["pdf", "doc", "docx", "zip", "txt", "md", "png", "jpg", "py", "js", "ts"];
@@ -60,11 +61,19 @@ export default function Home() {
     onError: (e) => toast.error(e.message),
   });
   const createTask = trpc.tasks.create.useMutation({
-    onSuccess: () => { toast.success("Tapşırıq yaradıldı"); dash.refetch(); },
+    onSuccess: () => {
+      toast.success("Tapşırıq yaradıldı");
+      setTask({ title: "", description: "", dueAt: "", allowedTypes: ["pdf", "docx", "zip", "txt", "md", "png", "jpg"], assigneeIds: [] });
+      dash.refetch();
+    },
     onError: (e) => toast.error(e.message),
   });
   const createLesson = trpc.lessons.create.useMutation({
-    onSuccess: () => { toast.success("Dərs əlavə edildi"); dash.refetch(); },
+    onSuccess: () => {
+      toast.success("Dərs əlavə edildi");
+      setLesson({ title: "", instructor: "", track: "", room: "", startsAt: "", endsAt: "" });
+      dash.refetch();
+    },
     onError: (e) => toast.error(e.message),
   });
   const submit = trpc.submissions.create.useMutation({
@@ -293,7 +302,7 @@ export default function Home() {
                     </div>
                     <div className="flex shrink-0 items-center gap-3">
                       <span className="text-xs text-slate-400">Son tarix: {t.dueAt ? new Date(t.dueAt).toLocaleDateString("az-AZ") : "Açıq"}</span>
-                      {!isStaff && !pastDue && <button onClick={() => doSubmit(t.id, t.allowedTypes)} className="flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-xs font-semibold text-white hover:bg-emerald-600"><Upload size={15} />Təhvil ver</button>}
+                      {!isStaff && !pastDue && !mySub && <button onClick={() => doSubmit(t.id, t.allowedTypes)} className="flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-xs font-semibold text-white hover:bg-emerald-600"><Upload size={15} />Təhvil ver</button>}
                       {isStaff && <button onClick={() => setTaskStatus.mutate({ id: t.id, status: "archived" })} className="rounded-xl bg-slate-100 px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-200">Arxivlə</button>}
                       {isStaff && <ConfirmButton onConfirm={() => removeTask.mutate({ id: t.id })} className="rounded-xl bg-red-50 px-4 py-2.5 text-xs font-semibold text-red-600 hover:bg-red-100" armedClassName="rounded-xl bg-red-600 px-4 py-2.5 text-xs font-bold text-white" pending={removeTask.isPending}>Sil</ConfirmButton>}
                     </div>
@@ -310,19 +319,11 @@ export default function Home() {
                     <textarea className="field min-h-28 md:col-span-2" placeholder="Açıqlama" value={task.description} onChange={(e) => setTask({ ...task, description: e.target.value })} />
                     <div className="md:col-span-2">
                       <p className="mb-2 text-xs font-semibold text-slate-500">Kimə? (boş = hamıya)</p>
-                      <div className="flex max-h-32 flex-wrap gap-2 overflow-y-auto">
-                        {((students.data ?? []) as { id: number; name: string | null; email: string | null }[]).map((s) => (
-                          <button
-                            key={s.id}
-                            type="button"
-                            onClick={() => toggleAssignee(s.id)}
-                            className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${task.assigneeIds.includes(s.id) ? "bg-blue-500 text-white" : "bg-slate-100 text-slate-500"}`}
-                          >
-                            {s.name || s.email}
-                          </button>
-                        ))}
-                        {!students.data?.length && <p className="text-xs text-slate-400">Tələbə yoxdur</p>}
-                      </div>
+                      <AssigneePicker
+                        students={((students.data ?? []) as { id: number; name: string | null; email: string | null }[])}
+                        selected={task.assigneeIds}
+                        onToggle={toggleAssignee}
+                      />
                     </div>
                     <div className="md:col-span-2">
                       <p className="mb-2 text-xs font-semibold text-slate-500">İcazəli fayl tipləri</p>
@@ -466,12 +467,11 @@ export default function Home() {
                               className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700"
                               onClick={() => {
                                 const g = grades[s.id];
-                                review.mutate({ id: s.id, status: "reviewed", feedback: feedbacks[s.id] || undefined, grade: g === undefined || g === "" ? undefined : Number(g) });
+                                review.mutate({ id: s.id, feedback: feedbacks[s.id] || undefined, grade: g === undefined || g === "" ? undefined : Number(g) });
                               }}
                             >
                               Qəbul
                             </button>
-                            <button className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700" onClick={() => review.mutate({ id: s.id, status: "returned", feedback: feedbacks[s.id] || undefined })}>Geri</button>
                           </div>
                         </td>
                       </tr>

@@ -42,6 +42,18 @@ describe("Zero Day intranet access", () => {
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
+  it("blocks task archive for students", async () => {
+    await expect(
+      appRouter.createCaller(context("user")).tasks.setStatus({ id: 1, status: "archived" })
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("blocks lesson delete for students", async () => {
+    await expect(
+      appRouter.createCaller(context("user")).lessons.remove({ id: 1 })
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
   it("rejects oversized file uploads", async () => {
     const big = "a".repeat(1_400_000);
     await expect(

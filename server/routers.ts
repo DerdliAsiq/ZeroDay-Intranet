@@ -12,12 +12,16 @@ import {
   createTask,
   createUser,
   dashboardStats,
+  deleteLesson,
+  deleteTask,
   deleteUser,
   getUserByEmail,
   listLessons,
   listSubmissions,
   listTasks,
   listUsers,
+  setLessonStatus,
+  setTaskStatus,
   touchLastSignIn,
   updateSubmission,
   updateUserPassword,
@@ -107,11 +111,24 @@ export const appRouter = router({
   })),
   tasks: router({
     list: protectedProcedure.query(() => listTasks()),
+    listAll: adminProcedure.query(() => listTasks(true)),
     create: adminProcedure
       .input(z.object({ title: z.string().min(3), description: z.string().min(3), dueAt: z.string().optional(), points: z.number().int().min(1).max(1000) }))
       .mutation(({ ctx, input }) =>
         createTask({ title: input.title, description: input.description, dueAt: input.dueAt ? new Date(input.dueAt) : null, points: input.points, status: "active", createdBy: ctx.user.id })
       ),
+    setStatus: adminProcedure
+      .input(z.object({ id: z.number(), status: z.enum(["active", "archived"]) }))
+      .mutation(async ({ input }) => {
+        await setTaskStatus(input.id, input.status);
+        return { success: true } as const;
+      }),
+    remove: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await deleteTask(input.id);
+        return { success: true } as const;
+      }),
   }),
   submissions: router({
     list: protectedProcedure.query(({ ctx }) => listSubmissions(ctx.user.role === "admin" ? undefined : ctx.user.id)),
@@ -142,11 +159,24 @@ export const appRouter = router({
   }),
   lessons: router({
     list: protectedProcedure.query(() => listLessons()),
+    listAll: adminProcedure.query(() => listLessons(true)),
     create: adminProcedure
       .input(z.object({ title: z.string(), instructor: z.string(), track: z.string(), room: z.string().optional(), startsAt: z.string(), endsAt: z.string() }))
       .mutation(({ ctx, input }) =>
-        createLesson({ title: input.title, instructor: input.instructor, track: input.track, room: input.room ?? null, startsAt: new Date(input.startsAt), endsAt: new Date(input.endsAt), createdBy: ctx.user.id })
+        createLesson({ title: input.title, instructor: input.instructor, track: input.track, room: input.room ?? null, startsAt: new Date(input.startsAt), endsAt: new Date(input.endsAt), status: "active", createdBy: ctx.user.id })
       ),
+    setStatus: adminProcedure
+      .input(z.object({ id: z.number(), status: z.enum(["active", "archived"]) }))
+      .mutation(async ({ input }) => {
+        await setLessonStatus(input.id, input.status);
+        return { success: true } as const;
+      }),
+    remove: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await deleteLesson(input.id);
+        return { success: true } as const;
+      }),
   }),
 });
 export type AppRouter = typeof appRouter;

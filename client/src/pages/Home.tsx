@@ -68,6 +68,25 @@ export default function Home() {
     onSuccess: () => { toast.success("Təhvil göndərildi"); dash.refetch(); },
     onError: (e) => toast.error(e.message),
   });
+  const allTasks = trpc.tasks.listAll.useQuery(undefined, { enabled: user?.role === "admin" });
+  const allLessons = trpc.lessons.listAll.useQuery(undefined, { enabled: user?.role === "admin" });
+  const refreshAll = () => { dash.refetch(); allTasks.refetch(); allLessons.refetch(); };
+  const setTaskStatus = trpc.tasks.setStatus.useMutation({
+    onSuccess: () => { toast.success("Yeniləndi"); refreshAll(); },
+    onError: (e) => toast.error(e.message),
+  });
+  const removeTask = trpc.tasks.remove.useMutation({
+    onSuccess: () => { toast.success("Silindi"); refreshAll(); },
+    onError: (e) => toast.error(e.message),
+  });
+  const setLessonStatus = trpc.lessons.setStatus.useMutation({
+    onSuccess: () => { toast.success("Yeniləndi"); refreshAll(); },
+    onError: (e) => toast.error(e.message),
+  });
+  const removeLesson = trpc.lessons.remove.useMutation({
+    onSuccess: () => { toast.success("Silindi"); refreshAll(); },
+    onError: (e) => toast.error(e.message),
+  });
   const [task, setTask] = useState({ title: "", description: "", dueAt: "", points: 100 });
   const [lesson, setLesson] = useState({ title: "", instructor: "", track: "", room: "", startsAt: "", endsAt: "" });
 
@@ -160,6 +179,23 @@ export default function Home() {
         </header>
 
         <main className="mx-auto max-w-7xl space-y-8 p-5 md:p-10">
+          {dash.isPending ? (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {[0, 1, 2, 3].map((i) => (
+                <Card key={i} className="p-5">
+                  <div className="h-4 w-24 animate-pulse rounded bg-slate-100" />
+                  <div className="mt-5 h-8 w-16 animate-pulse rounded bg-slate-100" />
+                </Card>
+              ))}
+            </div>
+          ) : dash.isError ? (
+            <Card className="p-10 text-center">
+              <p className="font-bold">Məlumat yüklənmədi</p>
+              <p className="mt-2 text-sm text-slate-500">Bağlantını yoxlayıb yenidən cəhd edin.</p>
+              <button className="primary mx-auto mt-4" onClick={() => dash.refetch()}>Təkrar yoxla</button>
+            </Card>
+          ) : (
+            <>
           {tab === "overview" && (
             <>
               <section className="rounded-3xl bg-slate-950 p-7 text-white md:p-10">
@@ -230,6 +266,8 @@ export default function Home() {
                     <div className="flex shrink-0 items-center gap-3">
                       <span className="text-xs text-slate-400">Son tarix: {t.dueAt ? new Date(t.dueAt).toLocaleDateString("az-AZ") : "Açıq"}</span>
                       {!isAdmin && <button onClick={() => doSubmit(t.id)} className="flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-xs font-semibold text-white hover:bg-emerald-600"><Upload size={15} />Təhvil ver</button>}
+                      {isAdmin && <button onClick={() => setTaskStatus.mutate({ id: t.id, status: "archived" })} className="rounded-xl bg-slate-100 px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-200">Arxivlə</button>}
+                      {isAdmin && <button onClick={() => { if (confirm(`"${t.title}" silinsin?`)) removeTask.mutate({ id: t.id }); }} className="rounded-xl bg-red-50 px-4 py-2.5 text-xs font-semibold text-red-600 hover:bg-red-100">Sil</button>}
                     </div>
                   </div>
                 </Card>
@@ -243,6 +281,22 @@ export default function Home() {
                     <textarea className="field min-h-28 md:col-span-2" placeholder="Açıqlama" value={task.description} onChange={(e) => setTask({ ...task, description: e.target.value })} />
                     <input className="field" type="datetime-local" value={task.dueAt} onChange={(e) => setTask({ ...task, dueAt: e.target.value })} />
                     <button className="primary" onClick={() => createTask.mutate(task)}><Plus size={16} />Yarat</button>
+                  </div>
+                </Card>
+              )}
+              {isAdmin && (
+                <Card className="p-6">
+                  <h3 className="font-bold">Arxivdəki tapşırıqlar ({((allTasks.data ?? []) as { status: string }[]).filter((t) => t.status === "archived").length})</h3>
+                  <div className="mt-4 space-y-3">
+                    {((allTasks.data ?? []) as { id: number; title: string; status: string }[]).filter((t) => t.status === "archived").map((t) => (
+                      <div key={t.id} className="flex items-center justify-between rounded-xl bg-slate-50 p-4">
+                        <p className="font-semibold">{t.title}</p>
+                        <div className="flex gap-2">
+                          <button onClick={() => setTaskStatus.mutate({ id: t.id, status: "active" })} className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">Bərpa et</button>
+                          <button onClick={() => { if (confirm(`"${t.title}" həmişəlik silinsin?`)) removeTask.mutate({ id: t.id }); }} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600">Sil</button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </Card>
               )}
@@ -260,6 +314,12 @@ export default function Home() {
                     <div className="mt-5 border-t border-slate-100 pt-4 text-sm font-semibold">
                       {new Date(l.startsAt).toLocaleString("az-AZ")} → {new Date(l.endsAt).toLocaleTimeString("az-AZ", { hour: "2-digit", minute: "2-digit" })}
                     </div>
+                    {isAdmin && (
+                      <div className="mt-4 flex gap-2">
+                        <button onClick={() => setLessonStatus.mutate({ id: l.id, status: "archived" })} className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-200">Arxivlə</button>
+                        <button onClick={() => { if (confirm(`"${l.title}" silinsin?`)) removeLesson.mutate({ id: l.id }); }} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100">Sil</button>
+                      </div>
+                    )}
                   </Card>
                 ))}
               </div>
@@ -277,6 +337,22 @@ export default function Home() {
                   </div>
                 </Card>
               )}
+              {isAdmin && (
+                <Card className="mt-6 p-6">
+                  <h3 className="font-bold">Arxivdəki dərslər ({((allLessons.data ?? []) as { status: string }[]).filter((l) => l.status === "archived").length})</h3>
+                  <div className="mt-4 space-y-3">
+                    {((allLessons.data ?? []) as { id: number; title: string; status: string }[]).filter((l) => l.status === "archived").map((l) => (
+                      <div key={l.id} className="flex items-center justify-between rounded-xl bg-slate-50 p-4">
+                        <p className="font-semibold">{l.title}</p>
+                        <div className="flex gap-2">
+                          <button onClick={() => setLessonStatus.mutate({ id: l.id, status: "active" })} className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">Bərpa et</button>
+                          <button onClick={() => { if (confirm(`"${l.title}" həmişəlik silinsin?`)) removeLesson.mutate({ id: l.id }); }} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600">Sil</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
             </section>
           )}
 
@@ -289,11 +365,19 @@ export default function Home() {
                     <tr><th className="pb-3">Tələbə</th><th className="pb-3">Task</th><th className="pb-3">Fayl</th><th className="pb-3">Status</th><th className="pb-3">Əməl</th></tr>
                   </thead>
                   <tbody>
-                    {(data?.submissions || []).map((s: { id: number; studentId: number; taskId: number; fileName: string | null; note: string | null; status: string }) => (
+                    {(data?.submissions || []).map((s: { id: number; studentId: number; taskId: number; fileName: string | null; note: string | null; status: string; fileData: string | null; fileUrl: string | null }) => (
                       <tr key={s.id} className="border-b border-slate-50">
                         <td className="py-4">#{s.studentId}</td>
                         <td>{s.taskId}</td>
-                        <td>{s.fileName || s.note || "—"}</td>
+                        <td>
+                          {s.fileData ? (
+                            <a href={s.fileData} download={s.fileName || "fayl"} className="font-semibold text-emerald-700 hover:underline">{s.fileName || "Faylı endir"}</a>
+                          ) : s.fileUrl ? (
+                            <a href={s.fileUrl} target="_blank" rel="noreferrer" className="font-semibold text-emerald-700 hover:underline">{s.fileName || "Faylı aç"}</a>
+                          ) : (
+                            s.note || "—"
+                          )}
+                        </td>
                         <td><Badge tone={s.status === "reviewed" ? "green" : "amber"}>{s.status}</Badge></td>
                         <td>
                           <div className="flex gap-2">
@@ -312,6 +396,8 @@ export default function Home() {
 
           {tab === "users" && isAdmin && <AdminUsers />}
           {tab === "account" && <Account />}
+            </>
+          )}
         </main>
       </div>
     </div>

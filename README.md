@@ -44,7 +44,7 @@ pnpm dev               # http://localhost:3000
 
 ## Roller ve akış
 
-- **Admin:** kullanıcı ekler/siler, şifre belirler/sıfırlar, tapşırıq ve dərs yaradır, təhvilləri qəbul/geri qaytarır.
+- **Admin:** kullanıcı ekler/siler, şifre belirler/sıfırlar, tapşırıq ve dərs yaradır, təhvilləri qəbul/geri qaytarır, təhvil dosyasını endirir, tapşırıq/dərsi arxivləyir, bərpa edir veya silir.
 - **Tələbə:** tapşırıqlara baxır, fayl (max 1 MB, DB'de saklanır) ilə təhvil verir, şifrəsini dəyişir.
 
 ## Güvenlik

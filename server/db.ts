@@ -91,10 +91,23 @@ export async function upsertUser(user: Partial<InsertUser> & { openId?: string |
   }
 }
 
-export async function listTasks() {
+export async function listTasks(includeArchived = false) {
   const db = await getDb();
   if (!db) return [];
+  if (includeArchived) return db.select().from(tasks).orderBy(desc(tasks.createdAt));
   return db.select().from(tasks).where(eq(tasks.status, "active")).orderBy(desc(tasks.createdAt));
+}
+
+export async function setTaskStatus(id: number, status: "active" | "archived") {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  return db.update(tasks).set({ status }).where(eq(tasks.id, id));
+}
+
+export async function deleteTask(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  return db.delete(tasks).where(eq(tasks.id, id));
 }
 
 export async function createTask(v: InsertTask) {
@@ -117,10 +130,23 @@ export async function createSubmission(v: InsertSubmission) {
   return db.insert(submissions).values(v);
 }
 
-export async function listLessons() {
+export async function listLessons(includeArchived = false) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(lessons).orderBy(lessons.startsAt);
+  if (includeArchived) return db.select().from(lessons).orderBy(lessons.startsAt);
+  return db.select().from(lessons).where(eq(lessons.status, "active")).orderBy(lessons.startsAt);
+}
+
+export async function setLessonStatus(id: number, status: "active" | "archived") {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  return db.update(lessons).set({ status }).where(eq(lessons.id, id));
+}
+
+export async function deleteLesson(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  return db.delete(lessons).where(eq(lessons.id, id));
 }
 
 export async function createLesson(v: InsertLesson) {
@@ -139,9 +165,9 @@ export async function dashboardStats() {
   const db = await getDb();
   if (!db) return { tasks: 0, submissions: 0, lessons: 0, students: 0 };
   const [t, s, l, u] = await Promise.all([
-    db.select({ n: sql<number>`count(*)` }).from(tasks),
+    db.select({ n: sql<number>`count(*)` }).from(tasks).where(eq(tasks.status, "active")),
     db.select({ n: sql<number>`count(*)` }).from(submissions),
-    db.select({ n: sql<number>`count(*)` }).from(lessons),
+    db.select({ n: sql<number>`count(*)` }).from(lessons).where(eq(lessons.status, "active")),
     db.select({ n: sql<number>`count(*)` }).from(users).where(eq(users.role, "user")),
   ]);
   return { tasks: Number(t[0]?.n ?? 0), submissions: Number(s[0]?.n ?? 0), lessons: Number(l[0]?.n ?? 0), students: Number(u[0]?.n ?? 0) };

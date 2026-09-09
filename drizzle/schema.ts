@@ -2,6 +2,7 @@ import { integer, pgEnum, pgTable, serial, text, timestamp, varchar } from "driz
 
 export const roleEnum = pgEnum("role", ["user", "admin"]);
 export const taskStatusEnum = pgEnum("task_status", ["active", "archived"]);
+export const lessonStatusEnum = pgEnum("lesson_status", ["active", "archived"]);
 export const submissionStatusEnum = pgEnum("submission_status", ["submitted", "reviewed", "returned"]);
 
 export const users = pgTable("users", {
@@ -53,6 +54,7 @@ export const lessons = pgTable("lessons", {
   room: varchar("room", { length: 120 }),
   startsAt: timestamp("startsAt").notNull(),
   endsAt: timestamp("endsAt").notNull(),
+  status: lessonStatusEnum("status").default("active").notNull(),
   createdBy: integer("createdBy").notNull(),
 });
 

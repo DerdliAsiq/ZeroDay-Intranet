@@ -134,7 +134,14 @@ export default function AdminUsers() {
               ))}
             </tbody>
           </table>
-          {!users.data?.length && <p className="py-8 text-center text-sm text-slate-400">İstifadəçi yoxdur.</p>}
+          {users.isPending && <p className="py-8 text-center text-sm text-slate-400">Yüklənir...</p>}
+          {users.isError && (
+            <div className="py-8 text-center">
+              <p className="text-sm font-semibold text-red-600">Siyahı yüklənmədi</p>
+              <button className="primary mx-auto mt-3 !py-2 text-xs" onClick={() => users.refetch()}>Təkrar yoxla</button>
+            </div>
+          )}
+          {users.isSuccess && !users.data?.length && <p className="py-8 text-center text-sm text-slate-400">İstifadəçi yoxdur.</p>}
         </div>
       </div>
     </div>

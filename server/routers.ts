@@ -156,9 +156,15 @@ export const appRouter = router({
     listAll: mentorProcedure.query(() => listTasks({ includeArchived: true })),
     create: mentorProcedure
       .input(z.object({ title: z.string().min(3), description: z.string().min(3), dueAt: z.string().optional(), allowedTypes: z.array(z.string()).optional(), assigneeIds: z.array(z.number().int()).optional() }))
-      .mutation(({ ctx, input }) =>
-        createTask({ title: input.title, description: input.description, dueAt: input.dueAt ? new Date(input.dueAt) : null, status: "active", allowedTypes: input.allowedTypes ?? DEFAULT_ALLOWED_TYPES, assigneeIds: input.assigneeIds?.length ? input.assigneeIds : null, createdBy: ctx.user.id })
-      ),
+      .mutation(({ ctx, input }) => {
+        let dueAt: Date | null = null;
+        if (input.dueAt) {
+          dueAt = new Date(input.dueAt);
+          if (Number.isNaN(dueAt.getTime())) throw new TRPCError({ code: "BAD_REQUEST", message: "Son tarix yanlışdır" });
+          if (dueAt.getTime() < Date.now()) throw new TRPCError({ code: "BAD_REQUEST", message: "Son tarix keçmişdə ola bilməz" });
+        }
+        return createTask({ title: input.title, description: input.description, dueAt, status: "active", allowedTypes: input.allowedTypes ?? DEFAULT_ALLOWED_TYPES, assigneeIds: input.assigneeIds?.length ? input.assigneeIds : null, createdBy: ctx.user.id });
+      }),
     setStatus: mentorProcedure
       .input(z.object({ id: z.number(), status: z.enum(["active", "archived"]) }))
       .mutation(async ({ input }) => {
@@ -226,7 +232,11 @@ export const appRouter = router({
       }),
     review: mentorProcedure
       .input(z.object({ id: z.number(), feedback: z.string().optional(), grade: z.number().int().min(0).max(10) }))
-      .mutation(({ input }) => updateSubmission(input.id, "reviewed", input.feedback, input.grade)),
+      .mutation(async ({ input }) => {
+        const sub = await getSubmissionById(input.id);
+        if (!sub) throw new TRPCError({ code: "NOT_FOUND", message: "Təhvil tapılmadı" });
+        return updateSubmission(input.id, input.feedback, input.grade);
+      }),
     download: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ ctx, input }) => {
@@ -243,10 +253,18 @@ export const appRouter = router({
     list: protectedProcedure.query(() => listLessons()),
     listAll: mentorProcedure.query(() => listLessons(true)),
     create: mentorProcedure
-      .input(z.object({ title: z.string(), instructor: z.string(), track: z.string(), room: z.string().optional(), startsAt: z.string(), endsAt: z.string() }))
-      .mutation(({ ctx, input }) =>
-        createLesson({ title: input.title, instructor: input.instructor, track: input.track, room: input.room ?? null, startsAt: new Date(input.startsAt), endsAt: new Date(input.endsAt), status: "active", createdBy: ctx.user.id })
-      ),
+      .input(z.object({ title: z.string().min(1), instructor: z.string().min(1), track: z.string().min(1), room: z.string().optional(), startsAt: z.string(), endsAt: z.string() }))
+      .mutation(({ ctx, input }) => {
+        const startsAt = new Date(input.startsAt);
+        const endsAt = new Date(input.endsAt);
+        if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Dərs tarixi yanlışdır" });
+        }
+        if (endsAt.getTime() <= startsAt.getTime()) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Bitiş başlanğıcdan sonra olmalıdır" });
+        }
+        return createLesson({ title: input.title, instructor: input.instructor, track: input.track, room: input.room ?? null, startsAt, endsAt, status: "active", createdBy: ctx.user.id });
+      }),
     setStatus: mentorProcedure
       .input(z.object({ id: z.number(), status: z.enum(["active", "archived"]) }))
       .mutation(async ({ input }) => {

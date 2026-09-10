@@ -2,6 +2,8 @@ import { and, desc, eq, ne, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { InsertLesson, InsertSubmission, InsertTask, InsertUser, lessons, submissions, tasks, users } from "../drizzle/schema";
 
+const DEFAULT_LIST_LIMIT = 200;
+
 let _db: ReturnType<typeof drizzle> | null = null;
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
@@ -28,17 +30,10 @@ export async function getUserByEmail(email: string) {
   return r[0];
 }
 
-export async function getUserByOpenId(openId: string) {
-  const db = await getDb();
-  if (!db) return undefined;
-  const r = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
-  return r[0];
-}
-
-export async function listUsers() {
+export async function listUsers(limit = DEFAULT_LIST_LIMIT) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(users).orderBy(desc(users.createdAt));
+  return db.select().from(users).orderBy(desc(users.createdAt)).limit(limit);
 }
 
 export async function createUser(v: InsertUser) {
@@ -79,12 +74,6 @@ export async function touchLastSignIn(id: number) {
   await db.update(users).set({ lastSignedIn: new Date() }).where(eq(users.id, id));
 }
 
-export async function deleteUser(id: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
-  return db.delete(users).where(eq(users.id, id));
-}
-
 export async function deleteUserCascade(id: number) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
@@ -107,31 +96,12 @@ export async function deleteUserCascade(id: number) {
   });
 }
 
-export async function upsertUser(user: Partial<InsertUser> & { openId?: string | null; email?: string | null }) {
-  const db = await getDb();
-  if (!db) return;
-  if (user.email) {
-    const existing = await getUserByEmail(user.email);
-    if (existing) {
-      await db.update(users).set({ ...user, lastSignedIn: new Date() }).where(eq(users.id, existing.id));
-      return;
-    }
-    await db.insert(users).values({ ...user, lastSignedIn: new Date() } as InsertUser);
-    return;
-  }
-  if (user.openId) {
-    const existing = await getUserByOpenId(user.openId);
-    if (existing) {
-      await db.update(users).set({ lastSignedIn: new Date() }).where(eq(users.id, existing.id));
-      return;
-    }
-    await db.insert(users).values(user as InsertUser);
-  }
-}
-
-export async function listTasks(opts: { includeArchived?: boolean; userId?: number; staff?: boolean; onlyUnexpired?: boolean } = {}) {
+export async function listTasks(
+  opts: { includeArchived?: boolean; userId?: number; staff?: boolean; onlyUnexpired?: boolean; limit?: number } = {}
+) {
   const db = await getDb();
   if (!db) return [];
+  const limit = opts.limit ?? DEFAULT_LIST_LIMIT;
   const conds = [];
   if (!opts.includeArchived) conds.push(eq(tasks.status, "active"));
   if (opts.onlyUnexpired) conds.push(sql`("tasks"."dueAt" IS NULL OR "tasks"."dueAt" >= now())`);
@@ -140,20 +110,19 @@ export async function listTasks(opts: { includeArchived?: boolean; userId?: numb
       sql`("tasks"."assigneeIds" IS NULL OR cardinality("tasks"."assigneeIds") = 0 OR ${opts.userId} = ANY("tasks"."assigneeIds"))`
     );
   }
-  if (conds.length === 0) return db.select().from(tasks).orderBy(desc(tasks.createdAt));
-  return db.select().from(tasks).where(conds.length === 1 ? conds[0] : and(...conds)).orderBy(desc(tasks.createdAt));
+  if (conds.length === 0) return db.select().from(tasks).orderBy(desc(tasks.createdAt)).limit(limit);
+  return db
+    .select()
+    .from(tasks)
+    .where(conds.length === 1 ? conds[0] : and(...conds))
+    .orderBy(desc(tasks.createdAt))
+    .limit(limit);
 }
 
 export async function setTaskStatus(id: number, status: "active" | "archived") {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
   return db.update(tasks).set({ status }).where(eq(tasks.id, id));
-}
-
-export async function deleteTask(id: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
-  return db.delete(tasks).where(eq(tasks.id, id));
 }
 
 export async function createTask(v: InsertTask) {
@@ -189,7 +158,7 @@ export async function getSubmissionById(id: number) {
   return r[0];
 }
 
-export async function listSubmissions(studentId?: number) {
+export async function listSubmissions(studentId?: number, limit = DEFAULT_LIST_LIMIT) {
   const db = await getDb();
   if (!db) return [];
   const base = db
@@ -199,7 +168,6 @@ export async function listSubmissions(studentId?: number) {
       studentId: submissions.studentId,
       note: submissions.note,
       fileName: submissions.fileName,
-      fileUrl: submissions.fileUrl,
       fileType: submissions.fileType,
       fileSize: submissions.fileSize,
       status: submissions.status,
@@ -215,8 +183,8 @@ export async function listSubmissions(studentId?: number) {
     .from(submissions)
     .leftJoin(users, eq(submissions.studentId, users.id))
     .leftJoin(tasks, eq(submissions.taskId, tasks.id));
-  if (studentId) return base.where(eq(submissions.studentId, studentId)).orderBy(desc(submissions.submittedAt));
-  return base.orderBy(desc(submissions.submittedAt));
+  if (studentId) return base.where(eq(submissions.studentId, studentId)).orderBy(desc(submissions.submittedAt)).limit(limit);
+  return base.orderBy(desc(submissions.submittedAt)).limit(limit);
 }
 
 export async function createSubmission(v: InsertSubmission) {
@@ -225,11 +193,11 @@ export async function createSubmission(v: InsertSubmission) {
   return db.insert(submissions).values(v);
 }
 
-export async function listLessons(includeArchived = false) {
+export async function listLessons(includeArchived = false, limit = DEFAULT_LIST_LIMIT) {
   const db = await getDb();
   if (!db) return [];
-  if (includeArchived) return db.select().from(lessons).orderBy(lessons.startsAt);
-  return db.select().from(lessons).where(eq(lessons.status, "active")).orderBy(lessons.startsAt);
+  if (includeArchived) return db.select().from(lessons).orderBy(lessons.startsAt).limit(limit);
+  return db.select().from(lessons).where(eq(lessons.status, "active")).orderBy(lessons.startsAt).limit(limit);
 }
 
 export async function setLessonStatus(id: number, status: "active" | "archived") {
@@ -257,16 +225,13 @@ export async function getTaskById(id: number) {
   return r[0];
 }
 
-export async function updateSubmission(id: number, status: "reviewed" | "returned", feedback?: string, grade?: number | null) {
+export async function updateSubmission(id: number, feedback: string | undefined, grade: number) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  const patch: Partial<typeof submissions.$inferInsert> = { status, feedback: feedback ?? null, reviewedAt: new Date() };
-  if (grade !== undefined && grade !== null) {
-    patch.grade = grade;
-    patch.fileData = null;
-    patch.fileSize = null;
-  }
-  return db.update(submissions).set(patch).where(eq(submissions.id, id));
+  return db
+    .update(submissions)
+    .set({ status: "reviewed", feedback: feedback ?? null, grade, fileData: null, fileSize: null, reviewedAt: new Date() })
+    .where(eq(submissions.id, id));
 }
 
 export async function dashboardStats(

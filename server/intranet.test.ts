@@ -78,10 +78,10 @@ describe("Zero Day intranet access", () => {
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
-  it("allows review for mentors (fails only on missing DB)", async () => {
+  it("rejects review for missing submission without DB", async () => {
     await expect(
       appRouter.createCaller(context("mentor")).submissions.review({ id: 1, grade: 8 })
-    ).rejects.toThrow("Database unavailable");
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
   it("rejects out-of-range grades", async () => {
@@ -93,6 +93,48 @@ describe("Zero Day intranet access", () => {
   it("rejects gradeless review", async () => {
     await expect(
       appRouter.createCaller(context("admin")).submissions.review({ id: 1 })
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("rejects review for missing submission", async () => {
+    await expect(
+      appRouter.createCaller(context("mentor")).submissions.review({ id: 999, grade: 8 })
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("rejects task creation with past due date", async () => {
+    await expect(
+      appRouter.createCaller(context("mentor")).tasks.create({
+        title: "Keçmiş task",
+        description: "Keçmiş açıqlama",
+        dueAt: new Date(Date.now() - 86400000).toISOString(),
+      })
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("rejects lesson with end before start", async () => {
+    const now = Date.now();
+    await expect(
+      appRouter.createCaller(context("mentor")).lessons.create({
+        title: "Dərs",
+        instructor: "Müəllim",
+        track: "Track",
+        startsAt: new Date(now + 3600000).toISOString(),
+        endsAt: new Date(now).toISOString(),
+      })
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("rejects lesson with empty title", async () => {
+    const now = Date.now();
+    await expect(
+      appRouter.createCaller(context("mentor")).lessons.create({
+        title: "",
+        instructor: "Müəllim",
+        track: "Track",
+        startsAt: new Date(now).toISOString(),
+        endsAt: new Date(now + 3600000).toISOString(),
+      })
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 

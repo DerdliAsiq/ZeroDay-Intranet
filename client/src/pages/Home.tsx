@@ -30,7 +30,7 @@ function Badge({ children, tone = "green" }: { children: React.ReactNode; tone?:
 
 type SubmissionRow = {
   id: number; studentId: number; taskId: number; fileName: string | null; note: string | null;
-  status: string; fileUrl: string | null; grade: number | null;
+  status: string; grade: number | null;
   studentName: string | null; studentEmail: string | null;
 };
 
@@ -521,8 +521,6 @@ export default function Home() {
                         <td>
                           {s.fileName ? (
                             <DownloadButton id={s.id} fileName={s.fileName} />
-                          ) : s.fileUrl ? (
-                            <a href={s.fileUrl} target="_blank" rel="noreferrer" className="font-semibold text-emerald-700 hover:underline">{s.fileName || "Faylı aç"}</a>
                           ) : (
                             <span>{s.note || "—"}</span>
                           )}
@@ -536,6 +534,7 @@ export default function Home() {
                               type="number"
                               min={0}
                               max={10}
+                              step={1}
                               placeholder="0-10"
                               className="field w-20 !py-1.5 text-center !text-xs"
                               value={grades[s.id] ?? ""}
@@ -556,7 +555,9 @@ export default function Home() {
                               className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 disabled:opacity-40"
                               disabled={(() => {
                                 const g = grades[s.id] ?? "";
-                                return g === "" || Number(g) < 0 || Number(g) > 10;
+                                if (g === "") return true;
+                                const n = Number(g);
+                                return !Number.isInteger(n) || n < 0 || n > 10;
                               })()}
                               onClick={() => {
                                 review.mutate({ id: s.id, feedback: feedbacks[s.id] || undefined, grade: Number(grades[s.id]) });

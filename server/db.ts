@@ -184,9 +184,12 @@ export async function listSubmissions(studentId?: number) {
       reviewedAt: submissions.reviewedAt,
       studentName: users.name,
       studentEmail: users.email,
+      taskTitle: tasks.title,
+      taskStatus: tasks.status,
     })
     .from(submissions)
-    .leftJoin(users, eq(submissions.studentId, users.id));
+    .leftJoin(users, eq(submissions.studentId, users.id))
+    .leftJoin(tasks, eq(submissions.taskId, tasks.id));
   if (studentId) return base.where(eq(submissions.studentId, studentId)).orderBy(desc(submissions.submittedAt));
   return base.orderBy(desc(submissions.submittedAt));
 }

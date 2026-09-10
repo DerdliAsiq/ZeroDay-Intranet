@@ -318,6 +318,22 @@ export default function Home() {
                 </Card>
                 );
               })}
+              {!isStaff && ((data?.submissions ?? []) as { taskId: number }[]).some((s) => !(data?.tasks ?? []).some((t: { id: number }) => t.id === s.taskId)) && (
+                <Card className="p-6">
+                  <h3 className="font-bold">Arxivdəki qiymətlərim</h3>
+                  <div className="mt-4 space-y-3">
+                    {((data?.submissions ?? []) as { taskId: number; grade: number | null; feedback: string | null; status: string; taskTitle?: string | null }[]).filter((s) => !(data?.tasks ?? []).some((t: { id: number }) => t.id === s.taskId)).map((s) => (
+                      <div key={`${s.taskId}`} className="flex flex-col gap-2 rounded-xl bg-slate-50 p-4 md:flex-row md:items-center md:justify-between">
+                        <div>
+                          <p className="font-semibold">{s.taskTitle ?? taskTitles[s.taskId] ?? `Task #${s.taskId}`}</p>
+                          {s.feedback && <p className="mt-1 max-w-2xl rounded-xl bg-emerald-50 p-2 text-sm leading-6 text-emerald-800">Rəy: {s.feedback}</p>}
+                        </div>
+                        {s.grade !== null && s.grade !== undefined ? <Badge>Qiymət: {s.grade}/10</Badge> : <Badge tone="amber">{s.status}</Badge>}
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
               {isStaff && (
                 <Card className="border-dashed p-6">
                   <h3 className="font-bold">Yeni tapşırıq yarat</h3>

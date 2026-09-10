@@ -553,10 +553,13 @@ export default function Home() {
                           />
                           <div className="flex gap-2">
                             <button
-                              className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700"
+                              className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 disabled:opacity-40"
+                              disabled={(() => {
+                                const g = grades[s.id] ?? "";
+                                return g === "" || Number(g) < 0 || Number(g) > 10;
+                              })()}
                               onClick={() => {
-                                const g = grades[s.id];
-                                review.mutate({ id: s.id, feedback: feedbacks[s.id] || undefined, grade: g === undefined || g === "" ? undefined : Number(g) });
+                                review.mutate({ id: s.id, feedback: feedbacks[s.id] || undefined, grade: Number(grades[s.id]) });
                               }}
                             >
                               Qəbul

@@ -85,6 +85,28 @@ export async function deleteUser(id: number) {
   return db.delete(users).where(eq(users.id, id));
 }
 
+export async function deleteUserCascade(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  return db.transaction(async (tx) => {
+    await tx.delete(submissions).where(eq(submissions.studentId, id));
+    const owned = await tx.select({ id: tasks.id }).from(tasks).where(eq(tasks.createdBy, id));
+    for (const t of owned) {
+      await tx.delete(submissions).where(eq(submissions.taskId, t.id));
+    }
+    if (owned.length) await tx.delete(tasks).where(eq(tasks.createdBy, id));
+    await tx.delete(lessons).where(eq(lessons.createdBy, id));
+    const assigned = await tx.select().from(tasks).where(sql`${id} = ANY("tasks"."assigneeIds")`);
+    for (const t of assigned) {
+      await tx
+        .update(tasks)
+        .set({ assigneeIds: (t.assigneeIds ?? []).filter((x) => x !== id) })
+        .where(eq(tasks.id, t.id));
+    }
+    await tx.delete(users).where(eq(users.id, id));
+  });
+}
+
 export async function upsertUser(user: Partial<InsertUser> & { openId?: string | null; email?: string | null }) {
   const db = await getDb();
   if (!db) return;
@@ -107,11 +129,12 @@ export async function upsertUser(user: Partial<InsertUser> & { openId?: string |
   }
 }
 
-export async function listTasks(opts: { includeArchived?: boolean; userId?: number; staff?: boolean } = {}) {
+export async function listTasks(opts: { includeArchived?: boolean; userId?: number; staff?: boolean; onlyUnexpired?: boolean } = {}) {
   const db = await getDb();
   if (!db) return [];
   const conds = [];
   if (!opts.includeArchived) conds.push(eq(tasks.status, "active"));
+  if (opts.onlyUnexpired) conds.push(sql`("tasks"."dueAt" IS NULL OR "tasks"."dueAt" >= now())`);
   if (!opts.staff && opts.userId !== undefined) {
     conds.push(
       sql`("tasks"."assigneeIds" IS NULL OR cardinality("tasks"."assigneeIds") = 0 OR ${opts.userId} = ANY("tasks"."assigneeIds"))`
@@ -246,7 +269,9 @@ export async function updateSubmission(id: number, status: "reviewed" | "returne
   return db.update(submissions).set(patch).where(eq(submissions.id, id));
 }
 
-export async function dashboardStats(opts: { userId?: number; staff?: boolean } = {}) {
+export async function dashboardStats(
+  opts: { userId?: number; staff?: boolean; prefetched?: { tasks?: { id: number }[]; submissions?: { taskId: number }[] } } = {}
+) {
   const db = await getDb();
   if (!db) return { tasks: 0, submissions: 0, lessons: 0, students: 0 };
   if (opts.staff || opts.userId === undefined) {
@@ -258,8 +283,8 @@ export async function dashboardStats(opts: { userId?: number; staff?: boolean } 
     ]);
     return { tasks: Number(t[0]?.n ?? 0), submissions: Number(s[0]?.n ?? 0), lessons: Number(l[0]?.n ?? 0), students: Number(u[0]?.n ?? 0) };
   }
-  const visibleTasks = await listTasks({ userId: opts.userId });
-  const ownSubmissions = await listSubmissions(opts.userId);
+  const visibleTasks = opts.prefetched?.tasks ?? (await listTasks({ userId: opts.userId, onlyUnexpired: true }));
+  const ownSubmissions = opts.prefetched?.submissions ?? (await listSubmissions(opts.userId));
   const [l, u] = await Promise.all([
     db.select({ n: sql<number>`count(*)` }).from(lessons).where(eq(lessons.status, "active")),
     db.select({ n: sql<number>`count(*)` }).from(users).where(eq(users.role, "student")),

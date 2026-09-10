@@ -15,7 +15,7 @@ import {
   dashboardStats,
   deleteLesson,
   deleteTaskWithSubmissions,
-  deleteUser,
+  deleteUserCascade,
   getSubmissionById,
   getTaskById,
   getUserByEmail,
@@ -43,11 +43,6 @@ function fileExtension(name: string): string {
 
 function isStaff(role: string) {
   return role === "admin" || role === "mentor";
-}
-
-function hideExpired<T extends { dueAt: Date | string | null }>(items: T[]): T[] {
-  const now = Date.now();
-  return items.filter((t) => !t.dueAt || new Date(t.dueAt).getTime() >= now);
 }
 
 export const appRouter = router({
@@ -120,7 +115,7 @@ export const appRouter = router({
       }),
     deleteUser: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
       if (input.id === ctx.user.id) throw new TRPCError({ code: "BAD_REQUEST", message: "Öz hesabınızı silə bilməzsiniz" });
-      await deleteUser(input.id);
+      await deleteUserCascade(input.id);
       return { success: true } as const;
     }),
     setRole: adminProcedure
@@ -133,25 +128,31 @@ export const appRouter = router({
   }),
   dashboard: protectedProcedure.query(async ({ ctx }) => {
     const staff = isStaff(ctx.user.role);
-    const submissions = await listSubmissions(staff ? undefined : ctx.user.id);
-    const tasks = await listTasks({ userId: ctx.user.id, staff });
-    const visibleTasks = staff ? tasks : hideExpired(tasks);
-    const stats = await dashboardStats({ userId: ctx.user.id, staff });
-    return {
-      stats: staff ? stats : { ...stats, tasks: visibleTasks.length, submissions: submissions.length },
-      tasks: visibleTasks,
-      lessons: await listLessons(),
-      submissions,
-    };
+    if (staff) {
+      const [tasks, submissions, lessons] = await Promise.all([
+        listTasks({ userId: ctx.user.id, staff }),
+        listSubmissions(undefined),
+        listLessons(),
+      ]);
+      return { stats: await dashboardStats({ userId: ctx.user.id, staff }), tasks, lessons, submissions };
+    }
+    const [tasks, submissions, lessons] = await Promise.all([
+      listTasks({ userId: ctx.user.id, onlyUnexpired: true }),
+      listSubmissions(ctx.user.id),
+      listLessons(),
+    ]);
+    const stats = await dashboardStats({ userId: ctx.user.id, prefetched: { tasks, submissions } });
+    return { stats, tasks, lessons, submissions };
   }),
   students: router({
     list: mentorProcedure.query(() => listStudents()),
   }),
   tasks: router({
-    list: protectedProcedure.query(async ({ ctx }) => {
-      const tasks = await listTasks({ userId: ctx.user.id, staff: isStaff(ctx.user.role) });
-      return isStaff(ctx.user.role) ? tasks : hideExpired(tasks);
-    }),
+    list: protectedProcedure.query(({ ctx }) =>
+      isStaff(ctx.user.role)
+        ? listTasks({ userId: ctx.user.id, staff: true })
+        : listTasks({ userId: ctx.user.id, onlyUnexpired: true })
+    ),
     listAll: mentorProcedure.query(() => listTasks({ includeArchived: true })),
     create: mentorProcedure
       .input(z.object({ title: z.string().min(3), description: z.string().min(3), dueAt: z.string().optional(), allowedTypes: z.array(z.string()).optional(), assigneeIds: z.array(z.number().int()).optional() }))
@@ -224,8 +225,8 @@ export const appRouter = router({
         });
       }),
     review: mentorProcedure
-      .input(z.object({ id: z.number(), feedback: z.string().optional(), grade: z.number().int().min(0).max(10).optional() }))
-      .mutation(({ input }) => updateSubmission(input.id, "reviewed", input.feedback, input.grade ?? null)),
+      .input(z.object({ id: z.number(), feedback: z.string().optional(), grade: z.number().int().min(0).max(10) }))
+      .mutation(({ input }) => updateSubmission(input.id, "reviewed", input.feedback, input.grade)),
     download: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ ctx, input }) => {

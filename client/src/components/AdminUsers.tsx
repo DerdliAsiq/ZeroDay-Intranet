@@ -133,6 +133,7 @@ export default function AdminUsers() {
                         className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100"
                         armedClassName="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white"
                         pending={remove.isPending}
+                        confirmText="Bəli, hər şeyi ilə silinsin"
                       >
                         Sil
                       </ConfirmButton>

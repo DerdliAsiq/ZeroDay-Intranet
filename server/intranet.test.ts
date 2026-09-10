@@ -90,6 +90,12 @@ describe("Zero Day intranet access", () => {
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
+  it("rejects gradeless review", async () => {
+    await expect(
+      appRouter.createCaller(context("admin")).submissions.review({ id: 1 })
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
   it("rejects oversized file uploads", async () => {
     const big = "a".repeat(134_000_000);
     await expect(

@@ -13,7 +13,7 @@ vi.mock("./db", async (importOriginal) => {
   };
 });
 
-import { dashboardStats, listSubmissions, listTasks } from "./db";
+import { dashboardStats, listLessons, listSubmissions, listTasks } from "./db";
 
 function context(role: "student" | "mentor"): TrpcContext {
   return {
@@ -37,18 +37,27 @@ function context(role: "student" | "mentor"): TrpcContext {
 
 const past = new Date(Date.now() - 86400000);
 const future = new Date(Date.now() + 86400000);
+const allTasks = [
+  { id: 1, dueAt: past },
+  { id: 2, dueAt: past },
+  { id: 3, dueAt: future },
+  { id: 4, dueAt: null },
+];
 
 describe("deadline keçmiş tasklar", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(listTasks).mockResolvedValue([
-      { id: 1, dueAt: past },
-      { id: 2, dueAt: past },
-      { id: 3, dueAt: future },
-      { id: 4, dueAt: null },
-    ] as never);
+    vi.mocked(listTasks).mockImplementation(async (opts?: { onlyUnexpired?: boolean }) =>
+      (opts?.onlyUnexpired ? allTasks.filter((t) => !t.dueAt || t.dueAt.getTime() >= Date.now()) : allTasks) as never
+    );
     vi.mocked(listSubmissions).mockResolvedValue([{ taskId: 2, grade: 9 } as never]);
-    vi.mocked(dashboardStats).mockResolvedValue({ tasks: 99, submissions: 99, lessons: 0, students: 0 });
+    vi.mocked(listLessons).mockResolvedValue([]);
+    vi.mocked(dashboardStats).mockImplementation(async (opts?: { prefetched?: { tasks?: unknown[]; submissions?: unknown[] } }) => ({
+      tasks: opts?.prefetched?.tasks?.length ?? 99,
+      submissions: opts?.prefetched?.submissions?.length ?? 99,
+      lessons: 0,
+      students: 0,
+    }));
   });
 
   it("tələbədə təhvilsiz expired gizlənir, təhvilli arxivə düşür", async () => {
@@ -56,6 +65,7 @@ describe("deadline keçmiş tasklar", () => {
     expect((dash.tasks as { id: number }[]).map((t) => t.id).sort()).toEqual([3, 4]);
     expect(dash.submissions).toHaveLength(1);
     expect(dash.stats.tasks).toBe(2);
+    expect(listTasks).toHaveBeenCalledWith(expect.objectContaining({ onlyUnexpired: true }));
     const list = await appRouter.createCaller(context("student")).tasks.list();
     expect((list as { id: number }[]).map((t) => t.id).sort()).toEqual([3, 4]);
   });
@@ -63,5 +73,6 @@ describe("deadline keçmiş tasklar", () => {
   it("staff-da hamısı görünür", async () => {
     const dash = await appRouter.createCaller(context("mentor")).dashboard();
     expect((dash.tasks as { id: number }[]).map((t) => t.id).sort()).toEqual([1, 2, 3, 4]);
+    expect(listTasks).toHaveBeenCalledWith(expect.objectContaining({ staff: true }));
   });
 });

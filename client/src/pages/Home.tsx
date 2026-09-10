@@ -320,7 +320,7 @@ export default function Home() {
               })}
               {!isStaff && ((data?.submissions ?? []) as { taskId: number }[]).some((s) => !(data?.tasks ?? []).some((t: { id: number }) => t.id === s.taskId)) && (
                 <Card className="p-6">
-                  <h3 className="font-bold">Arxivdəki qiymətlərim</h3>
+                  <h3 className="font-bold">Arxiv və bitmiş qiymətlərim</h3>
                   <div className="mt-4 space-y-3">
                     {((data?.submissions ?? []) as { taskId: number; grade: number | null; feedback: string | null; status: string; taskTitle?: string | null }[]).filter((s) => !(data?.tasks ?? []).some((t: { id: number }) => t.id === s.taskId)).map((s) => (
                       <div key={`${s.taskId}`} className="flex flex-col gap-2 rounded-xl bg-slate-50 p-4 md:flex-row md:items-center md:justify-between">

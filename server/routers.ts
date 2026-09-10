@@ -45,6 +45,11 @@ function isStaff(role: string) {
   return role === "admin" || role === "mentor";
 }
 
+function hideExpired<T extends { dueAt: Date | string | null }>(items: T[]): T[] {
+  const now = Date.now();
+  return items.filter((t) => !t.dueAt || new Date(t.dueAt).getTime() >= now);
+}
+
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -128,18 +133,25 @@ export const appRouter = router({
   }),
   dashboard: protectedProcedure.query(async ({ ctx }) => {
     const staff = isStaff(ctx.user.role);
+    const submissions = await listSubmissions(staff ? undefined : ctx.user.id);
+    const tasks = await listTasks({ userId: ctx.user.id, staff });
+    const visibleTasks = staff ? tasks : hideExpired(tasks);
+    const stats = await dashboardStats({ userId: ctx.user.id, staff });
     return {
-      stats: await dashboardStats({ userId: ctx.user.id, staff }),
-      tasks: await listTasks({ userId: ctx.user.id, staff }),
+      stats: staff ? stats : { ...stats, tasks: visibleTasks.length, submissions: submissions.length },
+      tasks: visibleTasks,
       lessons: await listLessons(),
-      submissions: await listSubmissions(staff ? undefined : ctx.user.id),
+      submissions,
     };
   }),
   students: router({
     list: mentorProcedure.query(() => listStudents()),
   }),
   tasks: router({
-    list: protectedProcedure.query(({ ctx }) => listTasks({ userId: ctx.user.id, staff: isStaff(ctx.user.role) })),
+    list: protectedProcedure.query(async ({ ctx }) => {
+      const tasks = await listTasks({ userId: ctx.user.id, staff: isStaff(ctx.user.role) });
+      return isStaff(ctx.user.role) ? tasks : hideExpired(tasks);
+    }),
     listAll: mentorProcedure.query(() => listTasks({ includeArchived: true })),
     create: mentorProcedure
       .input(z.object({ title: z.string().min(3), description: z.string().min(3), dueAt: z.string().optional(), allowedTypes: z.array(z.string()).optional(), assigneeIds: z.array(z.number().int()).optional() }))

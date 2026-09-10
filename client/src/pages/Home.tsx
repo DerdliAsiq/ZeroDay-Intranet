@@ -30,9 +30,33 @@ function Badge({ children, tone = "green" }: { children: React.ReactNode; tone?:
 
 type SubmissionRow = {
   id: number; studentId: number; taskId: number; fileName: string | null; note: string | null;
-  status: string; fileData: string | null; fileUrl: string | null; grade: number | null;
+  status: string; fileUrl: string | null; grade: number | null;
   studentName: string | null; studentEmail: string | null;
 };
+
+function DownloadButton({ id, fileName }: { id: number; fileName: string | null }) {
+  const [busy, setBusy] = useState(false);
+  const utils = trpc.useUtils();
+  const run = async () => {
+    setBusy(true);
+    try {
+      const d = await utils.client.submissions.download.query({ id });
+      const a = document.createElement("a");
+      a.href = d.fileData as string;
+      a.download = d.fileName || fileName || "fayl";
+      a.click();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Endirmə alınmadı");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <button onClick={run} disabled={busy} className="font-semibold text-emerald-700 hover:underline disabled:opacity-50">
+      {busy ? "Hazırlanır..." : fileName || "Faylı endir"}
+    </button>
+  );
+}
 
 function Account() {
   const [cur, setCur] = useState("");
@@ -235,7 +259,7 @@ export default function Home() {
             <>
               <section className="rounded-3xl bg-slate-950 p-7 text-white md:p-10">
                 <p className="text-xs font-bold uppercase tracking-[.2em] text-emerald-400">Focus / practice / ship</p>
-                <h2 className="mt-4 text-3xl font-bold tracking-tight md:text-5xl">Bilirdən nəticəyə.<br /><span className="text-emerald-400">Hər həftə bir addım.</span></h2>
+                <h2 className="mt-4 text-3xl font-bold tracking-tight md:text-5xl">Bilikdən nəticəyə.<br /><span className="text-emerald-400">Hər həftə bir addım.</span></h2>
                 <p className="mt-5 max-w-lg text-sm leading-7 text-slate-400">Tapşırıqları tamamla, həllərini təqdim et və sessiyanı qaçırma.</p>
               </section>
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -495,12 +519,12 @@ export default function Home() {
                         </td>
                         <td>{taskTitles[s.taskId] ?? <span className="text-slate-400">Task #{s.taskId} (silinib)</span>}</td>
                         <td>
-                          {s.fileData ? (
-                            <a href={s.fileData} download={s.fileName || "fayl"} className="font-semibold text-emerald-700 hover:underline">{s.fileName || "Faylı endir"}</a>
+                          {s.fileName ? (
+                            <DownloadButton id={s.id} fileName={s.fileName} />
                           ) : s.fileUrl ? (
                             <a href={s.fileUrl} target="_blank" rel="noreferrer" className="font-semibold text-emerald-700 hover:underline">{s.fileName || "Faylı aç"}</a>
                           ) : (
-                            <span>{s.fileName ? `${s.fileName} ` : ""}{s.fileName ? <span className="text-xs text-slate-400">(silinib)</span> : (s.note || "—")}</span>
+                            <span>{s.note || "—"}</span>
                           )}
                         </td>
                         <td><Badge tone={s.status === "reviewed" ? "green" : "amber"}>{s.status}</Badge></td>

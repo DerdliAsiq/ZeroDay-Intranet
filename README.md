@@ -1,6 +1,6 @@
 # ZeroDay Intranet
 
-Öğrenci kulübü intraneti: tapşırıqlar, təhvil/qimətləndirmə, dərs cədvəli və admin paneli.
+Öğrenci kulübü intraneti: tapşırıqlar, təhvil/qiymətləndirmə, dərs cədvəli və admin paneli.
 Tek servis (Express + statik frontend), Postgres, email+şifrə girişi.
 
 ## Stack

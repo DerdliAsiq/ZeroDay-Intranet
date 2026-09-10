@@ -31,7 +31,7 @@ export default function Login() {
             }}
           >
             <input className="field" type="email" required placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
-            <input className="field" type="password" required placeholder="Şifre" value={password} onChange={(e) => setPassword(e.target.value)} />
+            <input className="field" type="password" required placeholder="Şifrə" value={password} onChange={(e) => setPassword(e.target.value)} />
             {loginError && <p className="text-sm font-semibold text-red-600">{loginError.message}</p>}
             <button className="primary" type="submit" disabled={loggingIn}>
               {loggingIn ? "Daxil olunur..." : "Daxil ol"}

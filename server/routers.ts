@@ -14,9 +14,9 @@ import {
   createUser,
   dashboardStats,
   deleteLesson,
-  deleteSubmissionsByTask,
-  deleteTask,
+  deleteTaskWithSubmissions,
   deleteUser,
+  getSubmissionById,
   getTaskById,
   getUserByEmail,
   listLessons,
@@ -171,8 +171,7 @@ export const appRouter = router({
         if (pending > 0) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Qiymətləndirilməmiş təhvil var — əvvəlcə hamısını qiymətləndir" });
         }
-        await deleteSubmissionsByTask(input.id);
-        await deleteTask(input.id);
+        await deleteTaskWithSubmissions(input.id);
         return { success: true } as const;
       }),
   }),
@@ -181,6 +180,7 @@ export const appRouter = router({
     create: protectedProcedure
       .input(z.object({ taskId: z.number(), note: z.string().optional(), fileName: z.string().optional(), fileData: z.string().optional(), fileType: z.string().optional() }))
       .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "student") throw new TRPCError({ code: "FORBIDDEN", message: "Yalnız tələbələr təhvil verə bilər" });
         let fileSize: number | undefined;
         if (input.fileData) {
           const base64 = input.fileData.includes(",") ? input.fileData.split(",")[1] : input.fileData;
@@ -189,8 +189,14 @@ export const appRouter = router({
         }
         const task = await getTaskById(input.taskId);
         if (!task) throw new TRPCError({ code: "NOT_FOUND", message: "Tapşırıq tapılmadı" });
+        if (task.status !== "active") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Tapşırıq arxivdədir — təhvil bağlıdır" });
+        }
         if (task.dueAt && new Date(task.dueAt).getTime() < Date.now()) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Son tarix keçib — təhvil bağlıdır" });
+        }
+        if (task.assigneeIds?.length && !task.assigneeIds.includes(ctx.user.id)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Bu tapşırıq sizə təyin edilməyib" });
         }
         const existing = await listSubmissions(ctx.user.id);
         if (existing.some((s) => s.taskId === input.taskId)) {
@@ -220,6 +226,17 @@ export const appRouter = router({
     review: mentorProcedure
       .input(z.object({ id: z.number(), feedback: z.string().optional(), grade: z.number().int().min(0).max(10).optional() }))
       .mutation(({ input }) => updateSubmission(input.id, "reviewed", input.feedback, input.grade ?? null)),
+    download: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const sub = await getSubmissionById(input.id);
+        if (!sub) throw new TRPCError({ code: "NOT_FOUND", message: "Təhvil tapılmadı" });
+        if (!isStaff(ctx.user.role) && sub.studentId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Bu faylı endirə bilməzsiniz" });
+        }
+        if (!sub.fileData) throw new TRPCError({ code: "NOT_FOUND", message: "Fayl artıq silinib" });
+        return { fileName: sub.fileName, fileType: sub.fileType, fileData: sub.fileData };
+      }),
   }),
   lessons: router({
     list: protectedProcedure.query(() => listLessons()),

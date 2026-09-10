@@ -140,13 +140,6 @@ export async function createTask(v: InsertTask) {
   return rows[0];
 }
 
-export async function countSubmissionsByTask(taskId: number) {
-  const db = await getDb();
-  if (!db) return 0;
-  const r = await db.select({ n: sql<number>`count(*)` }).from(submissions).where(eq(submissions.taskId, taskId));
-  return Number(r[0]?.n ?? 0);
-}
-
 export async function countPendingSubmissionsByTask(taskId: number) {
   const db = await getDb();
   if (!db) return 0;
@@ -157,10 +150,20 @@ export async function countPendingSubmissionsByTask(taskId: number) {
   return Number(r[0]?.n ?? 0);
 }
 
-export async function deleteSubmissionsByTask(taskId: number) {
+export async function deleteTaskWithSubmissions(taskId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  return db.delete(submissions).where(eq(submissions.taskId, taskId));
+  return db.transaction(async (tx) => {
+    await tx.delete(submissions).where(eq(submissions.taskId, taskId));
+    await tx.delete(tasks).where(eq(tasks.id, taskId));
+  });
+}
+
+export async function getSubmissionById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const r = await db.select().from(submissions).where(eq(submissions.id, id)).limit(1);
+  return r[0];
 }
 
 export async function listSubmissions(studentId?: number) {
@@ -174,7 +177,6 @@ export async function listSubmissions(studentId?: number) {
       note: submissions.note,
       fileName: submissions.fileName,
       fileUrl: submissions.fileUrl,
-      fileData: submissions.fileData,
       fileType: submissions.fileType,
       fileSize: submissions.fileSize,
       status: submissions.status,
